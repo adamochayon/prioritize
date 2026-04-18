@@ -6,11 +6,11 @@ A Google Apps Script tool for force-ranking team priorities into buckets — no 
 
 ## Why this exists
 
-Google Forms can collect votes but can't do drag-to-bucket ranking. Survey tools are overkill for a single sprint planning session. Spreadsheets work but look terrible and don't aggregate. Prioritize is the minimum viable ranking tool: paste 3 files, deploy, share a URL.
+Google Forms can collect votes but can't do drag-to-bucket ranking. Survey tools are overkill for a single sprint planning session. Spreadsheets work but look terrible and don't aggregate. Prioritize is the minimum viable ranking tool: paste 5 files, deploy, share a URL.
 
 ## Features
 
-- 3 files of Apps Script — no CLI, no npm, no server
+- 5 files of Apps Script — no CLI, no npm, no server
 - Backed by Google Workspace identity; every vote tied to a real Google account
 - Domain-restricted by default; results stay inside your org
 - Two modes: MoSCoW (Must / Should / Could / Won't) and Top-N
