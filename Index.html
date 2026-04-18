@@ -98,6 +98,21 @@
     }
     button.primary:hover:not(:disabled) { filter: brightness(1.1); }
 
+    button.reset {
+      background: transparent;
+      color: var(--danger);
+      border: 1px solid var(--danger);
+      font: inherit;
+      font-size: 13px;
+      padding: 8px 16px;
+      cursor: pointer;
+      border-radius: 0;
+      width: 100%;
+      margin-top: 6px;
+      opacity: 0.8;
+    }
+    button.reset:hover { opacity: 1; }
+
     .blurb {
       color: var(--muted);
       font-size: 13px;
@@ -364,6 +379,7 @@
       </div>
 
       <button class="primary" id="submit-btn" disabled>Save ranking</button>
+      <button class="reset hidden" id="reset-btn">Reset my ranking</button>
     </div>
 
     <!-- RESULTS VIEW -->
@@ -582,6 +598,10 @@
       const btn = document.getElementById('submit-btn');
       btn.disabled = !allValid || state.submitting;
       btn.textContent = state.submitting ? 'Saving\u2026' : (state.hasPriorSubmission ? 'Update ranking' : 'Save ranking');
+
+      const resetBtn = document.getElementById('reset-btn');
+      resetBtn.classList.toggle('hidden', !state.hasPriorSubmission);
+      resetBtn.disabled = state.submitting;
     }
 
     // ---------- Submit ----------------------------------------------------
@@ -608,6 +628,42 @@
       state.submitting = false;
       state.hasPriorSubmission = true;
       state.lastSubmittedAt = res.submittedAt;
+      document.getElementById('status').classList.add('hidden');
+      syncUI();
+      renderIdentityStrip();
+    }
+
+    // ---------- Reset -----------------------------------------------------
+
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      if (state.submitting || !state.me) return;
+      state.submitting = true;
+      syncUI();
+      google.script.run
+        .withSuccessHandler(onReset)
+        .withFailureHandler((err) => {
+          state.submitting = false;
+          syncUI();
+          const el = document.getElementById('status');
+          el.className = 'notice error';
+          el.textContent = (err && err.message) || 'Reset failed.';
+          el.classList.remove('hidden');
+        })
+        .deleteMySubmission();
+    });
+
+    function onReset() {
+      state.submitting = false;
+      state.hasPriorSubmission = false;
+      state.lastSubmittedAt = null;
+
+      // Move all items back to the bank
+      const bankList = document.getElementById('bank-list');
+      document.querySelectorAll('.bucket .item').forEach(li => {
+        li.querySelectorAll('.bsel').forEach(b => b.classList.remove('active'));
+        bankList.appendChild(li);
+      });
+
       document.getElementById('status').classList.add('hidden');
       syncUI();
       renderIdentityStrip();

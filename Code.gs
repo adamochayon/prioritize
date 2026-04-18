@@ -490,6 +490,22 @@ function saveSubmission(payload) {
   }
 }
 
+function deleteMySubmission() {
+  const me = getCurrentUser_();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getSubmissionsSheet_();
+    const rows = readAllRows_();
+    const mine = rows.find((r) => normalizeEmail_(r.email) === me.email);
+    if (!mine) return { ok: true, deleted: false };
+    sheet.deleteRow(mine.rowIndex);
+    return { ok: true, deleted: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function getResults() {
   const cfg = getConfigFromSheet_();
   const admin = isAdmin_();
@@ -519,9 +535,9 @@ function getResults() {
     }));
   }
 
-  const submissions = shouldAnonymize ? [] : rows.map((r) => ({
-    email: r.email,
-    displayName: r.displayName,
+  const submissions = rows.map((r) => ({
+    email: shouldAnonymize ? '' : r.email,
+    displayName: shouldAnonymize ? 'Anonymous' : r.displayName,
     submittedAt: r.timestamp instanceof Date ? r.timestamp.toISOString() : r.timestamp,
     assignments: r.assignments,
   }));
