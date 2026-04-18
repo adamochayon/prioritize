@@ -106,6 +106,17 @@
       border-left: 2px solid var(--border);
       padding-left: 12px;
     }
+    .subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    .admin-link {
+      text-decoration: none;
+    }
+    .admin-link:hover {
+      color: var(--text);
+    }
     .identity-strip {
       font-size: 13px;
       color: var(--muted);
@@ -386,6 +397,31 @@
       state.me = boot.me;
       state.hasPriorSubmission = !!boot.mySubmission;
       state.lastSubmittedAt = boot.mySubmission ? boot.mySubmission.submittedAt : null;
+
+      // Update title from config
+      document.querySelector('header h1').textContent = state.config.title || 'Prioritize';
+
+      // Update blurb from config
+      const blurbEl = document.querySelector('p.blurb');
+      if (state.config.blurb) blurbEl.textContent = state.config.blurb;
+
+      // Add subtitle if provided
+      if (state.config.subtitle) {
+        const sub = document.createElement('div');
+        sub.className = 'subtitle';
+        sub.textContent = state.config.subtitle;
+        blurbEl.insertAdjacentElement('afterend', sub);
+      }
+
+      // Add Admin link if user is admin
+      if (boot.isAdmin) {
+        const nav = document.querySelector('nav.tabs');
+        const adminLink = document.createElement('a');
+        adminLink.href = '?v=admin';
+        adminLink.className = 'tab admin-link';
+        adminLink.textContent = 'Admin';
+        nav.appendChild(adminLink);
+      }
 
       renderBucketColumns();
       populateItems(boot.mySubmission);
