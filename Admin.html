@@ -255,31 +255,84 @@
     }
     .checkbox-label input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; width: 16px; height: 16px; }
 
-    .caps-grid {
+    /* Bucket editor */
+    .bucket-editor-row {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
+      grid-template-columns: 1fr 70px 70px auto;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
     }
-    .cap-field label {
-      display: block;
-      font-size: 11px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 4px;
-    }
-    .cap-field input {
-      display: block;
+    .bucket-editor-row input[type="text"],
+    .bucket-editor-row input[type="number"] {
       width: 100%;
       background: var(--bg-elev);
       border: 1px solid var(--border);
       color: var(--text);
       font: inherit;
       font-size: 14px;
-      padding: 8px 10px;
+      padding: 7px 10px;
       outline: none;
     }
-    .cap-field input:focus { border-color: var(--accent); }
+    .bucket-editor-row input[type="text"]:focus,
+    .bucket-editor-row input[type="number"]:focus { border-color: var(--accent); }
+    .bucket-editor-header {
+      display: grid;
+      grid-template-columns: 1fr 70px 70px auto;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .bucket-editor-header span {
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* Item editor */
+    .item-editor-row {
+      display: grid;
+      grid-template-columns: auto auto 1fr auto;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .item-editor-row input[type="text"] {
+      width: 100%;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      padding: 7px 10px;
+      outline: none;
+    }
+    .item-editor-row input[type="text"]:focus { border-color: var(--accent); }
+    .icon-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      cursor: pointer;
+      font: inherit;
+      font-size: 14px;
+      padding: 6px 8px;
+      line-height: 1;
+    }
+    .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .icon-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+    .add-row-btn {
+      background: none;
+      border: 1px dashed var(--border);
+      color: var(--muted);
+      cursor: pointer;
+      font: inherit;
+      font-size: 13px;
+      padding: 8px 12px;
+      margin-top: 4px;
+      width: 100%;
+      text-align: left;
+    }
+    .add-row-btn:hover { border-color: var(--accent); color: var(--accent); }
 
     .save-btn {
       background: var(--accent);
@@ -359,25 +412,15 @@
         </div>
 
         <div class="field" id="caps-field">
-          <label>Bucket caps</label>
-          <div class="caps-grid">
-            <div class="cap-field">
-              <label for="cap-must">Must have</label>
-              <input type="number" id="cap-must" min="0" max="99">
-            </div>
-            <div class="cap-field">
-              <label for="cap-should">Should have</label>
-              <input type="number" id="cap-should" min="0" max="99">
-            </div>
-            <div class="cap-field">
-              <label for="cap-could">Could have</label>
-              <input type="number" id="cap-could" min="0" max="99">
-            </div>
-            <div class="cap-field">
-              <label for="cap-wont">Won't have</label>
-              <input type="number" id="cap-wont" min="0" max="99">
-            </div>
+          <label>Buckets</label>
+          <div class="bucket-editor-header">
+            <span>Label</span>
+            <span>Weight</span>
+            <span>Cap</span>
+            <span></span>
           </div>
+          <div id="bucket-editor-rows"></div>
+          <button type="button" class="add-row-btn" id="add-bucket-btn">+ Add bucket</button>
         </div>
 
         <div class="field">
@@ -404,6 +447,15 @@
 
         <div id="save-notice" class="notice hidden"></div>
         <button class="save-btn" id="save-btn">Save config</button>
+      </div>
+
+      <!-- Items section -->
+      <div class="admin-section">
+        <div class="admin-section-title">Items</div>
+        <div class="config-form">
+          <div id="item-editor-rows"></div>
+          <button type="button" class="add-row-btn" id="add-item-btn">+ Add item</button>
+        </div>
       </div>
 
       <!-- Results section -->
@@ -439,6 +491,7 @@
       document.getElementById('view-ranking-link').href = data.webAppUrl;
 
       populateForm(data.config);
+      populateItems(data.config.items || []);
       loadResults();
     }
 
@@ -478,25 +531,21 @@
       document.getElementById('caps-field').style.display  = isMoscow ? '' : 'none';
       document.getElementById('topn-field').style.display  = isMoscow ? 'none' : '';
 
-      if (isMoscow && buckets) {
-        var capMap = {};
-        buckets.forEach(function(b) { capMap[b.id] = b.cap; });
-        var mustEl   = document.getElementById('cap-must');
-        var shouldEl = document.getElementById('cap-should');
-        var couldEl  = document.getElementById('cap-could');
-        var wontEl   = document.getElementById('cap-wont');
-        if (mustEl)   mustEl.value   = capMap['must']   != null ? capMap['must']   : 2;
-        if (shouldEl) shouldEl.value = capMap['should'] != null ? capMap['should'] : 2;
-        if (couldEl)  couldEl.value  = capMap['could']  != null ? capMap['could']  : 2;
-        if (wontEl)   wontEl.value   = capMap['wont']   != null ? capMap['wont']   : 2;
-      }
-
       if (!isMoscow && buckets) {
         var topBucket = buckets.find(function(b) { return b.id === 'top'; });
         if (topBucket && topBucket.cap) {
           document.getElementById('cfg-topn').value = topBucket.cap;
         }
       }
+
+      if (isMoscow && buckets) {
+        populateBuckets(buckets);
+      } else if (isMoscow) {
+        // switching to moscow with no buckets provided — leave existing editor state
+      }
+
+      // show/hide add-bucket button based on mode
+      document.getElementById('add-bucket-btn').style.display = isMoscow ? '' : 'none';
     }
 
     document.querySelectorAll('input[name="mode"]').forEach(function(r) {
@@ -505,31 +554,219 @@
       });
     });
 
+    // ---------- Bucket editor ----------------------------------------------
+
+    function populateBuckets(buckets) {
+      var container = document.getElementById('bucket-editor-rows');
+      container.innerHTML = '';
+      (buckets || []).forEach(function(b) {
+        addBucketRow(b);
+      });
+    }
+
+    function addBucketRow(bucket) {
+      var container = document.getElementById('bucket-editor-rows');
+      var row = document.createElement('div');
+      row.className = 'bucket-editor-row';
+      row.dataset.bucketId = bucket ? (bucket.id || '') : '';
+
+      var labelInput = document.createElement('input');
+      labelInput.type = 'text';
+      labelInput.placeholder = 'Label';
+      labelInput.value = bucket ? (bucket.label || '') : '';
+      labelInput.dataset.field = 'label';
+
+      var weightInput = document.createElement('input');
+      weightInput.type = 'number';
+      weightInput.placeholder = 'Wt';
+      weightInput.min = '0';
+      weightInput.max = '999';
+      weightInput.value = bucket ? (bucket.weight != null ? bucket.weight : '') : '';
+      weightInput.dataset.field = 'weight';
+
+      var capInput = document.createElement('input');
+      capInput.type = 'number';
+      capInput.placeholder = 'Cap';
+      capInput.min = '0';
+      capInput.max = '999';
+      capInput.value = bucket ? (bucket.cap != null ? bucket.cap : '') : '';
+      capInput.dataset.field = 'cap';
+
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'icon-btn danger';
+      delBtn.textContent = '×';
+      delBtn.title = 'Remove bucket';
+      delBtn.addEventListener('click', function() { container.removeChild(row); });
+
+      row.appendChild(labelInput);
+      row.appendChild(weightInput);
+      row.appendChild(capInput);
+      row.appendChild(delBtn);
+      container.appendChild(row);
+    }
+
+    function collectBuckets() {
+      // Returns array of bucket objects, or null if in topn mode.
+      var modeEl = document.querySelector('input[name="mode"]:checked');
+      var mode = modeEl ? modeEl.value : 'moscow';
+      if (mode === 'topn') {
+        var n = parseInt(document.getElementById('cfg-topn').value, 10);
+        if (!(n > 0)) n = 5;
+        return [{ id: 'top', label: 'Top ' + n, weight: 1, cap: n }];
+      }
+      var rows = document.querySelectorAll('#bucket-editor-rows .bucket-editor-row');
+      var buckets = [];
+      rows.forEach(function(row, idx) {
+        var labelEl  = row.querySelector('[data-field="label"]');
+        var weightEl = row.querySelector('[data-field="weight"]');
+        var capEl    = row.querySelector('[data-field="cap"]');
+        var label  = labelEl  ? labelEl.value.trim()  : '';
+        var weight = weightEl ? parseInt(weightEl.value, 10) : 0;
+        var cap    = capEl    ? parseInt(capEl.value,    10) : 0;
+        // Generate a stable id for new buckets (no pre-set id)
+        var id = row.dataset.bucketId || ('bucket_' + Date.now() + '_' + idx);
+        if (isNaN(weight)) weight = 0;
+        if (isNaN(cap))    cap    = 0;
+        buckets.push({ id: id, label: label, weight: weight, cap: cap });
+      });
+      return buckets;
+    }
+
+    document.getElementById('add-bucket-btn').addEventListener('click', function() {
+      addBucketRow(null);
+    });
+
+    // ---------- Item editor ------------------------------------------------
+
+    function populateItems(items) {
+      var container = document.getElementById('item-editor-rows');
+      container.innerHTML = '';
+      (items || []).forEach(function(item) {
+        addItemRow(item);
+      });
+    }
+
+    function addItemRow(item) {
+      var container = document.getElementById('item-editor-rows');
+      var row = document.createElement('div');
+      row.className = 'item-editor-row';
+      // Store the stable id as a data attribute so renames preserve it
+      row.dataset.itemId = item ? (item.id || '') : '';
+
+      var upBtn = document.createElement('button');
+      upBtn.type = 'button';
+      upBtn.className = 'icon-btn';
+      upBtn.textContent = '↑';
+      upBtn.title = 'Move up';
+      upBtn.addEventListener('click', function() {
+        var prev = row.previousElementSibling;
+        if (prev) container.insertBefore(row, prev);
+      });
+
+      var downBtn = document.createElement('button');
+      downBtn.type = 'button';
+      downBtn.className = 'icon-btn';
+      downBtn.textContent = '↓';
+      downBtn.title = 'Move down';
+      downBtn.addEventListener('click', function() {
+        var next = row.nextElementSibling;
+        if (next) container.insertBefore(next, row);
+      });
+
+      var nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.placeholder = 'Item name';
+      nameInput.value = item ? (item.name || '') : '';
+      nameInput.dataset.field = 'name';
+
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'icon-btn danger';
+      delBtn.textContent = '×';
+      delBtn.title = 'Delete item';
+      delBtn.addEventListener('click', function() { container.removeChild(row); });
+
+      row.appendChild(upBtn);
+      row.appendChild(downBtn);
+      row.appendChild(nameInput);
+      row.appendChild(delBtn);
+      container.appendChild(row);
+    }
+
+    function collectItems() {
+      var rows = document.querySelectorAll('#item-editor-rows .item-editor-row');
+      var items = [];
+      rows.forEach(function(row, idx) {
+        var nameEl = row.querySelector('[data-field="name"]');
+        var name = nameEl ? nameEl.value.trim() : '';
+        if (!name) return; // skip blank rows
+        var id = row.dataset.itemId || ('item_' + Date.now() + '_' + idx);
+        items.push({ id: id, name: name, description: '', order: idx });
+      });
+      return items;
+    }
+
+    document.getElementById('add-item-btn').addEventListener('click', function() {
+      // Generate a new unique id for fresh items
+      addItemRow({ id: 'item_' + Date.now() + '_' + Math.floor(Math.random() * 10000), name: '' });
+      // Focus the new input
+      var rows = document.querySelectorAll('#item-editor-rows .item-editor-row');
+      if (rows.length) {
+        var last = rows[rows.length - 1];
+        var inp = last.querySelector('[data-field="name"]');
+        if (inp) inp.focus();
+      }
+    });
+
+    // ---------- Inline validation ------------------------------------------
+
+    function validatePayload(payload) {
+      // Items
+      if (!payload.items || payload.items.length === 0) {
+        return 'Items list cannot be empty.';
+      }
+      for (var i = 0; i < payload.items.length; i++) {
+        if (!payload.items[i].name) return 'Item #' + (i + 1) + ' has no name.';
+      }
+
+      // Buckets (MoSCoW only)
+      if (payload.mode !== 'topn') {
+        if (!payload.buckets || payload.buckets.length === 0) {
+          return 'Add at least one bucket.';
+        }
+        for (var j = 0; j < payload.buckets.length; j++) {
+          var b = payload.buckets[j];
+          if (!b.label) return 'Bucket #' + (j + 1) + ' has no label.';
+          if (b.weight < 0) return 'Bucket "' + b.label + '" weight must be 0 or greater.';
+          if (b.cap < 0)    return 'Bucket "' + b.label + '" cap must be 0 or greater.';
+        }
+        // Cap sum check (mirrors server — catches it client-side first)
+        var hasUnlimited = payload.buckets.some(function(b) { return b.cap == null || b.cap === 0; });
+        if (!hasUnlimited) {
+          var capSum = payload.buckets.reduce(function(s, b) { return s + (b.cap || 0); }, 0);
+          if (capSum !== payload.items.length) {
+            return 'Bucket caps must sum to the number of items (' + payload.items.length + '). Current sum: ' + capSum + '.';
+          }
+        }
+      } else {
+        // Top-N
+        var n = payload.buckets && payload.buckets[0] && payload.buckets[0].cap;
+        if (!(n >= 1 && n <= payload.items.length)) {
+          return 'Top-N cap must be between 1 and the number of items (' + payload.items.length + ').';
+        }
+      }
+      return null; // valid
+    }
+
     // ---------- Save -------------------------------------------------------
 
     document.getElementById('save-btn').addEventListener('click', function() {
       var modeEl = document.querySelector('input[name="mode"]:checked');
       var mode = modeEl ? modeEl.value : 'moscow';
 
-      var buckets;
-      if (mode === 'topn') {
-        var n = parseInt(document.getElementById('cfg-topn').value, 10);
-        if (!(n > 0)) n = 5;
-        buckets = [
-          { id: 'top', label: 'Top ' + n, weight: 1, cap: n },
-        ];
-      } else {
-        var mustCap   = parseInt(document.getElementById('cap-must').value,   10) || 2;
-        var shouldCap = parseInt(document.getElementById('cap-should').value, 10) || 2;
-        var couldCap  = parseInt(document.getElementById('cap-could').value,  10) || 2;
-        var wontCap   = parseInt(document.getElementById('cap-wont').value,   10) || 2;
-        buckets = [
-          { id: 'must',   label: 'Must have',   weight: 12, cap: mustCap   },
-          { id: 'should', label: 'Should have', weight: 6,  cap: shouldCap },
-          { id: 'could',  label: 'Could have',  weight: 2,  cap: couldCap  },
-          { id: 'wont',   label: "Won't have",  weight: 0,  cap: wontCap   },
-        ];
-      }
+      var buckets = collectBuckets();
+      var items   = collectItems();
 
       var rvEl = document.querySelector('input[name="results_visibility"]:checked');
       var rv = rvEl ? rvEl.value : 'always';
@@ -546,10 +783,18 @@
         blurb:             document.getElementById('cfg-blurb').value,
         mode:              mode,
         buckets:           buckets,
+        items:             items,
         resultsVisibility: rv,
         anonymous:         document.getElementById('cfg-anonymous').checked,
         adminEmails:       adminEmails,
       };
+
+      // Client-side validation before hitting the server
+      var validationError = validatePayload(payload);
+      if (validationError) {
+        showSaveNotice(validationError, 'error');
+        return;
+      }
 
       var modeChanging = mode !== currentMode;
       if (modeChanging) {
@@ -565,16 +810,24 @@
       btn.disabled = true;
 
       google.script.run
-        .withSuccessHandler(function() { onSaved(mode); })
+        .withSuccessHandler(function() { onSaved(mode, items.length); })
         .withFailureHandler(onSaveError)
         .saveConfig(payload);
     });
 
-    function onSaved(savedMode) {
+    function onSaved(savedMode, itemCount) {
       document.getElementById('save-btn').disabled = false;
+      var modeDidChange = savedMode && savedMode !== currentMode;
       if (savedMode) currentMode = savedMode;
-      if (boot && boot.stats) boot.stats.submissionCount = 0;
+      if (boot && boot.stats) {
+        if (modeDidChange) boot.stats.submissionCount = 0;
+        if (itemCount != null) {
+          boot.stats.itemCount = itemCount;
+          document.getElementById('stat-items').textContent = itemCount;
+        }
+      }
       showSaveNotice('Saved.', 'success');
+      loadResults();
     }
 
     function onSaveError(err) {
@@ -625,7 +878,6 @@
 
       var cfg = (boot && boot.config) || {};
       var buckets = cfg.buckets || [];
-      var items = cfg.buckets ? null : [];
 
       var voterCount = data.submissions.length;
       var itemsHtml = data.items.map(function(item, idx) {

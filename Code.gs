@@ -377,16 +377,18 @@ function saveConfig(payload) {
     throw new Error('MODE_CHANGE_NEEDS_CONFIRM');
   }
 
+  // --- Determine effective item count (use incoming items if provided, else current sheet) ---
+  const effectiveItems = payload.items !== undefined ? payload.items : getItemsFromSheet_();
+
   // --- MoSCoW cap-sum validation ---
   if (payload.buckets !== undefined && newMode !== 'topn') {
     const buckets = payload.buckets;
     const hasUnlimited = buckets.some(function(b) { return b.cap == null || b.cap === 0; });
     if (!hasUnlimited) {
-      const items = getItemsFromSheet_();
       const capSum = buckets.reduce(function(s, b) { return s + (Number(b.cap) || 0); }, 0);
-      if (capSum !== items.length) {
+      if (capSum !== effectiveItems.length) {
         throw new Error(
-          'Bucket caps must sum to the number of items (' + items.length + '). ' +
+          'Bucket caps must sum to the number of items (' + effectiveItems.length + '). ' +
           'Current sum: ' + capSum + '. Adjust caps before saving.'
         );
       }
@@ -397,10 +399,9 @@ function saveConfig(payload) {
   if (payload.buckets !== undefined && newMode === 'topn') {
     const topBucket = payload.buckets.find(function(b) { return b.id === 'top'; });
     if (topBucket) {
-      const items = getItemsFromSheet_();
-      if (!(topBucket.cap >= 1 && topBucket.cap <= items.length)) {
+      if (!(topBucket.cap >= 1 && topBucket.cap <= effectiveItems.length)) {
         throw new Error(
-          'Top-N cap must be between 1 and the number of items (' + items.length + ').'
+          'Top-N cap must be between 1 and the number of items (' + effectiveItems.length + ').'
         );
       }
     }
@@ -449,6 +450,32 @@ function saveConfig(payload) {
       sheet.getRange(i + 2, 2).setValue(updates[key]);
     }
   });
+
+  // --- Write items to Items sheet if provided ---
+  if (payload.items !== undefined) {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const itemsSheet = getItemsSheet_();
+      const lastItem = itemsSheet.getLastRow();
+      if (lastItem >= 2) {
+        itemsSheet.deleteRows(2, lastItem - 1);
+      }
+      const itemRows = payload.items.map(function(item, index) {
+        return [
+          String(item.id || '').trim(),
+          String(item.name || '').trim(),
+          String(item.description || '').trim(),
+          index,
+        ];
+      });
+      if (itemRows.length > 0) {
+        itemsSheet.getRange(2, 1, itemRows.length, 4).setValues(itemRows);
+      }
+    } finally {
+      lock.releaseLock();
+    }
+  }
 }
 
 // ---------- Validation ---------------------------------------------------
