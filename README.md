@@ -27,7 +27,7 @@ Google Forms can collect votes but can't do drag-to-bucket ranking. Survey tools
 
 1. `git clone https://github.com/adamochayon/prioritize.git && cd prioritize`
 2. Enable the Apps Script API once at [script.google.com/home/usersettings](https://script.google.com/home/usersettings).
-3. Use Node 22+. If you have [nvm](https://github.com/nvm-sh/nvm), run `nvm use` (reads `.nvmrc`). Otherwise install Node 22+ from [nodejs.org](https://nodejs.org).
+3. Use Node 22+. With [fnm](https://github.com/Schniz/fnm) (recommended) or [nvm](https://github.com/nvm-sh/nvm), run `fnm use` / `nvm use` to pick up `.nvmrc`. Otherwise install Node 22+ from [nodejs.org](https://nodejs.org).
 4. `npm install && npm run setup` — follow the browser prompts.
 
 ### Manual install

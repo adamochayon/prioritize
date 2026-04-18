@@ -11,7 +11,7 @@ Because Apps Script can't run outside Google, **there are no automated tests**. 
 ## Setup (recommended)
 
 1. Fork this repo and clone it locally.
-2. Node 22+ is required. With [nvm](https://github.com/nvm-sh/nvm): `nvm use` picks up `.nvmrc`. Without nvm: install Node 22+ from [nodejs.org](https://nodejs.org).
+2. Node 22+ is required. With [fnm](https://github.com/Schniz/fnm) (recommended) or [nvm](https://github.com/nvm-sh/nvm): `fnm use` / `nvm use` picks up `.nvmrc`. Otherwise install Node 22+ from [nodejs.org](https://nodejs.org).
 3. `npm install && npm run setup` — creates your own Apps Script project and deploys it.
 4. Edit files in `src/`. Run `npm run setup` again to push + redeploy. Or use `npm run push` / `npm run deploy` for the finer-grained steps.
 
