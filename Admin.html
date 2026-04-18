@@ -417,6 +417,7 @@
 
   <script>
     var boot = null;
+    var currentMode = 'moscow';
 
     // ---------- Boot -------------------------------------------------------
 
@@ -427,6 +428,7 @@
 
     function onAdminBoot(data) {
       boot = data;
+      currentMode = (data.config && data.config.mode) || 'moscow';
       document.getElementById('boot-loading').classList.add('hidden');
       document.getElementById('admin-body').classList.remove('hidden');
 
@@ -483,10 +485,10 @@
         var shouldEl = document.getElementById('cap-should');
         var couldEl  = document.getElementById('cap-could');
         var wontEl   = document.getElementById('cap-wont');
-        if (mustEl)   mustEl.value   = capMap['must']   != null ? capMap['must']   : 3;
-        if (shouldEl) shouldEl.value = capMap['should'] != null ? capMap['should'] : 4;
-        if (couldEl)  couldEl.value  = capMap['could']  != null ? capMap['could']  : 4;
-        if (wontEl)   wontEl.value   = capMap['wont']   != null ? capMap['wont']   : 5;
+        if (mustEl)   mustEl.value   = capMap['must']   != null ? capMap['must']   : 2;
+        if (shouldEl) shouldEl.value = capMap['should'] != null ? capMap['should'] : 2;
+        if (couldEl)  couldEl.value  = capMap['could']  != null ? capMap['could']  : 2;
+        if (wontEl)   wontEl.value   = capMap['wont']   != null ? capMap['wont']   : 2;
       }
 
       if (!isMoscow && buckets) {
@@ -506,11 +508,8 @@
     // ---------- Save -------------------------------------------------------
 
     document.getElementById('save-btn').addEventListener('click', function() {
-      var btn = document.getElementById('save-btn');
-      btn.disabled = true;
-
-      var mode = document.querySelector('input[name="mode"]:checked');
-      mode = mode ? mode.value : 'moscow';
+      var modeEl = document.querySelector('input[name="mode"]:checked');
+      var mode = modeEl ? modeEl.value : 'moscow';
 
       var buckets;
       if (mode === 'topn') {
@@ -520,10 +519,10 @@
           { id: 'top', label: 'Top ' + n, weight: 1, cap: n },
         ];
       } else {
-        var mustCap   = parseInt(document.getElementById('cap-must').value,   10) || 3;
-        var shouldCap = parseInt(document.getElementById('cap-should').value, 10) || 4;
-        var couldCap  = parseInt(document.getElementById('cap-could').value,  10) || 4;
-        var wontCap   = parseInt(document.getElementById('cap-wont').value,   10) || 5;
+        var mustCap   = parseInt(document.getElementById('cap-must').value,   10) || 2;
+        var shouldCap = parseInt(document.getElementById('cap-should').value, 10) || 2;
+        var couldCap  = parseInt(document.getElementById('cap-could').value,  10) || 2;
+        var wontCap   = parseInt(document.getElementById('cap-wont').value,   10) || 2;
         buckets = [
           { id: 'must',   label: 'Must have',   weight: 12, cap: mustCap   },
           { id: 'should', label: 'Should have', weight: 6,  cap: shouldCap },
@@ -552,14 +551,29 @@
         adminEmails:       adminEmails,
       };
 
+      var modeChanging = mode !== currentMode;
+      if (modeChanging) {
+        var subCount = (boot && boot.stats && boot.stats.submissionCount) || 0;
+        var msg = subCount > 0
+          ? 'Switching mode will permanently delete ' + subCount + ' existing submission' + (subCount === 1 ? '' : 's') + '. Continue?'
+          : 'Switching mode will clear all existing submissions. Continue?';
+        if (!confirm(msg)) return;
+        payload.confirmSubmissionsWipe = true;
+      }
+
+      var btn = document.getElementById('save-btn');
+      btn.disabled = true;
+
       google.script.run
-        .withSuccessHandler(onSaved)
+        .withSuccessHandler(function() { onSaved(mode); })
         .withFailureHandler(onSaveError)
         .saveConfig(payload);
     });
 
-    function onSaved() {
+    function onSaved(savedMode) {
       document.getElementById('save-btn').disabled = false;
+      if (savedMode) currentMode = savedMode;
+      if (boot && boot.stats) boot.stats.submissionCount = 0;
       showSaveNotice('Saved.', 'success');
     }
 

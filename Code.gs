@@ -27,10 +27,10 @@ const DEFAULT_ITEMS = [
 ];
 
 const DEFAULT_BUCKETS = [
-  { id: 'must',   label: 'Must have',   weight: 12, cap: 3 },
-  { id: 'should', label: 'Should have', weight: 6,  cap: 4 },
-  { id: 'could',  label: 'Could have',  weight: 2,  cap: 4 },
-  { id: 'wont',   label: "Won't have",  weight: 0,  cap: 5 },
+  { id: 'must',   label: 'Must have',   weight: 12, cap: 2 },
+  { id: 'should', label: 'Should have', weight: 6,  cap: 2 },
+  { id: 'could',  label: 'Could have',  weight: 2,  cap: 2 },
+  { id: 'wont',   label: "Won't have",  weight: 0,  cap: 2 },
 ];
 
 // Override auto-derived display names for emails that don't title-case cleanly.
@@ -367,18 +367,78 @@ function saveConfig(payload) {
   }
   if (!payload || typeof payload !== 'object') throw new Error('Invalid payload');
 
+  // --- Mode-change guard ---
+  const currentCfg = getConfigFromSheet_();
+  const currentMode = currentCfg.mode;
+  const newMode = payload.mode !== undefined ? String(payload.mode) : currentMode;
+  const modeChanging = newMode !== currentMode;
+
+  if (modeChanging && !payload.confirmSubmissionsWipe) {
+    throw new Error('MODE_CHANGE_NEEDS_CONFIRM');
+  }
+
+  // --- MoSCoW cap-sum validation ---
+  if (payload.buckets !== undefined && newMode !== 'topn') {
+    const buckets = payload.buckets;
+    const hasUnlimited = buckets.some(function(b) { return b.cap == null || b.cap === 0; });
+    if (!hasUnlimited) {
+      const items = getItemsFromSheet_();
+      const capSum = buckets.reduce(function(s, b) { return s + (Number(b.cap) || 0); }, 0);
+      if (capSum !== items.length) {
+        throw new Error(
+          'Bucket caps must sum to the number of items (' + items.length + '). ' +
+          'Current sum: ' + capSum + '. Adjust caps before saving.'
+        );
+      }
+    }
+  }
+
+  // --- Top-N cap validation ---
+  if (payload.buckets !== undefined && newMode === 'topn') {
+    const topBucket = payload.buckets.find(function(b) { return b.id === 'top'; });
+    if (topBucket) {
+      const items = getItemsFromSheet_();
+      if (!(topBucket.cap >= 1 && topBucket.cap <= items.length)) {
+        throw new Error(
+          'Top-N cap must be between 1 and the number of items (' + items.length + ').'
+        );
+      }
+    }
+  }
+
   const sheet = getConfigSheet_();
   const last = sheet.getLastRow();
   if (last < 2) return;
 
   const rows = sheet.getRange(2, 1, last - 1, 2).getValues();
 
+  // --- If mode is changing, wipe Submissions first ---
+  if (modeChanging) {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const subSheet = getSubmissionsSheet_();
+      const lastSub = subSheet.getLastRow();
+      if (lastSub >= 2) {
+        subSheet.deleteRows(2, lastSub - 1);
+      }
+    } finally {
+      lock.releaseLock();
+    }
+  }
+
+  // --- When switching Top-N → MoSCoW with empty/no buckets, re-seed MoSCoW defaults ---
+  let bucketsToSave = payload.buckets;
+  if (modeChanging && newMode === 'moscow' && (!bucketsToSave || bucketsToSave.length === 0)) {
+    bucketsToSave = DEFAULT_BUCKETS;
+  }
+
   const updates = {};
   if (payload.title       !== undefined) updates['title']              = String(payload.title);
   if (payload.subtitle    !== undefined) updates['subtitle']           = String(payload.subtitle);
-  if (payload.blurb       !== undefined) updates['blurb']             = String(payload.blurb);
+  if (payload.blurb       !== undefined) updates['blurb']              = String(payload.blurb);
   if (payload.mode        !== undefined) updates['mode']               = String(payload.mode);
-  if (payload.buckets     !== undefined) updates['buckets_json']       = JSON.stringify(payload.buckets);
+  if (bucketsToSave       !== undefined) updates['buckets_json']       = JSON.stringify(bucketsToSave);
   if (payload.resultsVisibility !== undefined) updates['results_visibility'] = String(payload.resultsVisibility);
   if (payload.anonymous   !== undefined) updates['anonymous']          = String(!!payload.anonymous);
   if (payload.adminEmails !== undefined) updates['admin_emails']       = Array.isArray(payload.adminEmails) ? payload.adminEmails.join('\n') : String(payload.adminEmails);
