@@ -182,7 +182,7 @@ function isAdmin_() {
   try {
     const me = normalizeEmail_(Session.getActiveUser().getEmail());
     if (!me) { _isAdminCache = false; return false; }
-    const cfg = getConfigFromSheet_();
+    const cfg = getConfig_();
     const admins = (cfg.adminEmails || []).map(function(e) { return String(e).trim().toLowerCase(); });
     _isAdminCache = admins.indexOf(me) !== -1;
     return _isAdminCache;
@@ -208,23 +208,6 @@ function doGet(e) {
     .setTitle('Prioritize')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-}
-
-// ---------- Config -------------------------------------------------------
-
-function getConfig_() {
-  const cfg = getConfigFromSheet_();
-  const items = getItemsFromSheet_();
-  return {
-    items: items,
-    buckets: cfg.buckets,
-    title: cfg.title,
-    subtitle: cfg.subtitle,
-    blurb: cfg.blurb,
-    mode: cfg.mode,
-    resultsVisibility: cfg.resultsVisibility,
-    anonymous: cfg.anonymous,
-  };
 }
 
 // ---------- Identity -----------------------------------------------------
@@ -325,7 +308,7 @@ function safeParse_(cell) {
 
 // ---------- Sheet readers ------------------------------------------------
 
-function getConfigFromSheet_() {
+function getConfig_() {
   const sheet = getConfigSheet_();
   const last = sheet.getLastRow();
   const defaults = DEFAULT_CONFIG;
@@ -447,7 +430,7 @@ function saveConfig(payload) {
   lock.waitLock(10000);
   try {
     // --- Read current mode inside the lock to avoid a TOCTOU on modeChanging ---
-    const currentCfg = getConfigFromSheet_();
+    const currentCfg = getConfig_();
     const currentMode = currentCfg.mode;
     const newMode = payload.mode !== undefined ? String(payload.mode) : currentMode;
     const modeChanging = newMode !== currentMode;
@@ -524,13 +507,13 @@ function saveConfig(payload) {
 
 // ---------- Validation ---------------------------------------------------
 
-// Reads runtime items/buckets from getConfig_() to avoid hardcoded references.
+// Reads runtime items/buckets from config to avoid hardcoded references.
 function validateAssignments_(assignments) {
   if (!assignments || typeof assignments !== 'object' || Array.isArray(assignments)) {
     throw new Error('assignments must be an object');
   }
   const cfg = getConfig_();
-  const items   = cfg.items;
+  const items   = getItemsFromSheet_();
   const buckets = cfg.buckets;
   const mode    = cfg.mode;
 
@@ -579,8 +562,19 @@ function validateAssignments_(assignments) {
 function getBoot() {
   ensureInstalled_();
   const me = getCurrentUser_();
+  const cfg = getConfig_();
+  const items = getItemsFromSheet_();
   return {
-    config: getConfig_(),
+    config: {
+      items:             items,
+      buckets:           cfg.buckets,
+      title:             cfg.title,
+      subtitle:          cfg.subtitle,
+      blurb:             cfg.blurb,
+      mode:              cfg.mode,
+      resultsVisibility: cfg.resultsVisibility,
+      anonymous:         cfg.anonymous,
+    },
     me: me,
     mySubmission: findSubmissionByEmail_(me.email),
     isAdmin: isAdmin_(),
@@ -676,7 +670,7 @@ function deleteMySubmission() {
 
 function getResults() {
   ensureInstalled_();
-  const cfg = getConfigFromSheet_();
+  const cfg = getConfig_();
   const admin = isAdmin_();
 
   if (!admin) {
@@ -722,7 +716,7 @@ function getAdminBoot() {
   if (!isAdmin_()) {
     throw new Error('Not authorized — admin access required.');
   }
-  const cfg = getConfigFromSheet_();
+  const cfg = getConfig_();
   const items = getItemsFromSheet_();
   const rows = readAllRows_();
   const me = getCurrentUser_();
@@ -748,10 +742,10 @@ function getAdminBoot() {
   };
 }
 
-// Reads runtime items/buckets from getConfig_() to avoid hardcoded references.
+// Reads runtime items/buckets from config to avoid hardcoded references.
 function aggregate_(rows) {
   const cfg = getConfig_();
-  const items   = cfg.items;
+  const items   = getItemsFromSheet_();
   const buckets = cfg.buckets;
 
   const bucketWeightMap = {};

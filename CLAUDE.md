@@ -43,7 +43,7 @@ Single-file Google Apps Script web app for force-ranking team priorities into bu
 ## Conventions in this codebase
 
 - Trailing-underscore functions (`foo_`) are private by convention — not called from the client.
-- Defaults live in two places that must stay in sync: the `DEFAULT_*` consts and the fallback in `getConfigFromSheet_()`.
+- Config defaults live in one place: `DEFAULT_CONFIG` at the top of `Code.gs`. `ensureInstalled_` seeds from it and `getConfig_` falls back to it.
 - Dark terminal aesthetic. CSS variables at the top of `Index.html` (`--bg`, `--accent`, etc.) — reuse them rather than hard-coding colors.
 - Bucket ids (`must`, `should`, `could`, `wont`) are hard-coded in some CSS selectors (`.bucket[data-bucket-id="must"]`). If you add new bucket ids you'll need to update those too.
 
@@ -52,5 +52,6 @@ Single-file Google Apps Script web app for force-ranking team priorities into bu
 - Before editing, read the target file in full — the files are small enough.
 - Prefer editing existing functions over adding new ones. The file is deliberately flat.
 - Keep changes minimal and scoped. No speculative refactors.
-- When a UI string is configurable (title, subtitle, blurb), update the default in `seedDefaultsIfEmpty_` AND the fallback in `getConfigFromSheet_()`.
+- When a UI string is configurable (title, subtitle, blurb), update `DEFAULT_CONFIG` — both the installer and the runtime fallback read from it.
+- Sheet-side setup is one-shot: `ensureInstalled_()` runs on the first request after deploy (gated on `ScriptProperties.INSTALLED_AT`) and is a no-op thereafter. Getters (`getConfigSheet_`, etc.) are pure — they do not seed or repair.
 - Do not commit `.clasp.json` (it's gitignored). Do not commit changes to `appsscript.json` timezone — that's a per-deploy choice.
