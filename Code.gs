@@ -272,9 +272,31 @@ function seedDefaultsIfEmpty_(ss) {
   }
 
   const lastItemRow = itemsSheet.getLastRow();
-  if (lastItemRow < 2) {
+  const freshItems = lastItemRow < 2;
+  if (freshItems) {
     DEFAULT_ITEMS.forEach(function(item, index) {
       itemsSheet.appendRow([item.id, item.name, '', index]);
+    });
+  }
+
+  // --- Submissions sheet ---
+  let subSheet = ss.getSheetByName('Submissions');
+  if (!subSheet) {
+    subSheet = ss.insertSheet('Submissions');
+    subSheet.appendRow(HEADERS);
+  }
+
+  // Seed example submissions only on a fully fresh install (items were just created).
+  if (freshItems && subSheet.getLastRow() < 2) {
+    const now = new Date();
+    const exampleSubmissions = [
+      ['alice@example.com',  'Alice',  { sso: 'must', mobile_app: 'must', dark_mode: 'should', api_v2: 'should', audit_log: 'could', bulk_import: 'could', chat_ops: 'wont', ai_assist: 'wont' }],
+      ['bob@example.com',    'Bob',    { sso: 'must', api_v2: 'must', audit_log: 'should', chat_ops: 'should', mobile_app: 'could', bulk_import: 'could', dark_mode: 'wont', ai_assist: 'wont' }],
+      ['carol@example.com',  'Carol',  { api_v2: 'must', audit_log: 'must', sso: 'should', ai_assist: 'should', chat_ops: 'could', bulk_import: 'could', mobile_app: 'wont', dark_mode: 'wont' }],
+      ['dave@example.com',   'Dave',   { sso: 'must', chat_ops: 'must', api_v2: 'should', ai_assist: 'should', audit_log: 'could', mobile_app: 'could', bulk_import: 'wont', dark_mode: 'wont' }],
+    ];
+    exampleSubmissions.forEach(function(row) {
+      subSheet.appendRow([now, row[0], row[1], JSON.stringify(row[2])]);
     });
   }
 }
@@ -383,15 +405,19 @@ function saveConfig(payload) {
   // --- MoSCoW cap-sum validation ---
   if (payload.buckets !== undefined && newMode !== 'topn') {
     const buckets = payload.buckets;
-    const hasUnlimited = buckets.some(function(b) { return b.cap == null || b.cap === 0; });
-    if (!hasUnlimited) {
-      const capSum = buckets.reduce(function(s, b) { return s + (Number(b.cap) || 0); }, 0);
-      if (capSum !== effectiveItems.length) {
+    for (const b of buckets) {
+      if (!b.cap || Number(b.cap) < 1) {
         throw new Error(
-          'Bucket caps must sum to the number of items (' + effectiveItems.length + '). ' +
-          'Current sum: ' + capSum + '. Adjust caps before saving.'
+          'Bucket "' + (b.label || b.id) + '" cap must be 1 or greater.'
         );
       }
+    }
+    const capSum = buckets.reduce(function(s, b) { return s + Number(b.cap); }, 0);
+    if (capSum !== effectiveItems.length) {
+      throw new Error(
+        'Bucket caps must sum to the number of items (' + effectiveItems.length + '). ' +
+        'Current sum: ' + capSum + '. Adjust caps before saving.'
+      );
     }
   }
 
@@ -409,7 +435,7 @@ function saveConfig(payload) {
 
   const sheet = getConfigSheet_();
   const last = sheet.getLastRow();
-  if (last < 2) return;
+  if (last < 2) return { ok: true };
 
   const rows = sheet.getRange(2, 1, last - 1, 2).getValues();
 
@@ -476,6 +502,8 @@ function saveConfig(payload) {
       lock.releaseLock();
     }
   }
+
+  return { ok: true };
 }
 
 // ---------- Validation ---------------------------------------------------
@@ -510,9 +538,8 @@ function validateAssignments_(assignments) {
     return;
   }
 
-  // MoSCoW (and any future multi-bucket modes): all items must be assigned.
-  const hasUnlimitedCap = buckets.some(function(b) { return b.cap == null || b.cap === 0; });
-  if (!hasUnlimitedCap && gotKeys.length !== items.length) {
+  // MoSCoW: all items must be assigned, all caps strictly enforced.
+  if (gotKeys.length !== items.length) {
     throw new Error(`Expected ${items.length} items, got ${gotKeys.length}`);
   }
 
@@ -521,8 +548,7 @@ function validateAssignments_(assignments) {
   for (const bucketId of Object.values(assignments)) counts[bucketId]++;
 
   for (const bucket of buckets) {
-    const isUnlimited = bucket.cap == null || bucket.cap === 0;
-    if (!isUnlimited && counts[bucket.id] !== bucket.cap) {
+    if (counts[bucket.id] !== bucket.cap) {
       throw new Error(`${bucket.label} must contain exactly ${bucket.cap} items (has ${counts[bucket.id]})`);
     }
   }
@@ -586,6 +612,24 @@ function saveSubmission(payload) {
       overwritten: !!existing,
       submittedAt: now.toISOString(),
     };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deleteAllSubmissions() {
+  if (!isAdmin_()) {
+    throw new Error('Not authorized — admin access required.');
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getSubmissionsSheet_();
+    const lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      sheet.deleteRows(2, lastRow - 1);
+    }
+    return { ok: true };
   } finally {
     lock.releaseLock();
   }
