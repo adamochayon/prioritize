@@ -65,6 +65,38 @@ var _rowsCache    = null;  // null = uncached; array = cached readAllRows_ resul
 
 // ---------- Installer ----------------------------------------------------
 
+// Appends any missing default config rows to the given Config sheet.
+// adminEmail is used only when seeding the admin_emails row for the first time.
+// Pass '' when calling from saveConfig (the payload's adminEmails will overwrite if present).
+function seedConfigRowsIfMissing_(sheet, adminEmail) {
+  const effectiveAdminEmail = adminEmail || '';
+  const defaultConfigRows = [
+    ['title',              DEFAULT_CONFIG.title],
+    ['subtitle',           DEFAULT_CONFIG.subtitle],
+    ['blurb',              DEFAULT_CONFIG.blurb],
+    ['mode',               DEFAULT_CONFIG.mode],
+    ['buckets_json',       JSON.stringify(DEFAULT_CONFIG.buckets)],
+    ['results_visibility', DEFAULT_CONFIG.resultsVisibility],
+    ['anonymous',          String(DEFAULT_CONFIG.anonymous)],
+    ['admin_emails',       effectiveAdminEmail],
+  ];
+
+  const lastRow = sheet.getLastRow();
+  const existingKeys = {};
+  if (lastRow >= 2) {
+    const existing = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+    existing.forEach(function(row) {
+      if (row[0]) existingKeys[String(row[0])] = true;
+    });
+  }
+
+  defaultConfigRows.forEach(function(pair) {
+    if (!existingKeys[pair[0]]) {
+      sheet.appendRow(pair);
+    }
+  });
+}
+
 function ensureInstalled_() {
   const props = PropertiesService.getScriptProperties();
   if (props.getProperty('INSTALLED_AT')) return;
@@ -91,38 +123,10 @@ function ensureInstalled_() {
     adminEmail = '';
   }
   if (!adminEmail) {
-    try {
-      adminEmail = Session.getActiveUser().getEmail();
-    } catch (e) {
-      adminEmail = '';
-    }
+    console.warn('ensureInstalled_: getEffectiveUser() returned empty — seeding admin_emails as empty. Add an admin email manually via the Config sheet.');
   }
 
-  const defaultConfigRows = [
-    ['title',              DEFAULT_CONFIG.title],
-    ['subtitle',           DEFAULT_CONFIG.subtitle],
-    ['blurb',              DEFAULT_CONFIG.blurb],
-    ['mode',               DEFAULT_CONFIG.mode],
-    ['buckets_json',       JSON.stringify(DEFAULT_CONFIG.buckets)],
-    ['results_visibility', DEFAULT_CONFIG.resultsVisibility],
-    ['anonymous',          String(DEFAULT_CONFIG.anonymous)],
-    ['admin_emails',       adminEmail],
-  ];
-
-  const lastConfigRow = configSheet.getLastRow();
-  const existingKeys = {};
-  if (lastConfigRow >= 2) {
-    const existing = configSheet.getRange(2, 1, lastConfigRow - 1, 2).getValues();
-    existing.forEach(function(row) {
-      if (row[0]) existingKeys[String(row[0])] = true;
-    });
-  }
-
-  defaultConfigRows.forEach(function(pair) {
-    if (!existingKeys[pair[0]]) {
-      configSheet.appendRow(pair);
-    }
-  });
+  seedConfigRowsIfMissing_(configSheet, adminEmail);
 
   // --- Items sheet ---
   let itemsSheet = ss.getSheetByName('Items');
@@ -451,33 +455,35 @@ function saveConfig(payload) {
     }
 
     const sheet = getConfigSheet_();
+
+    // Ensure all default config rows exist; heals a manually wiped Config sheet.
+    seedConfigRowsIfMissing_(sheet, '');
+
     const last = sheet.getLastRow();
-    if (last >= 2) {
-      const rows = sheet.getRange(2, 1, last - 1, 2).getValues();
+    const rows = sheet.getRange(2, 1, last - 1, 2).getValues();
 
-      // --- When switching Top-N → MoSCoW with empty/no buckets, re-seed MoSCoW defaults ---
-      let bucketsToSave = payload.buckets;
-      if (modeChanging && newMode === 'moscow' && (!bucketsToSave || bucketsToSave.length === 0)) {
-        bucketsToSave = DEFAULT_BUCKETS;
-      }
-
-      const updates = {};
-      if (payload.title       !== undefined) updates['title']              = String(payload.title);
-      if (payload.subtitle    !== undefined) updates['subtitle']           = String(payload.subtitle);
-      if (payload.blurb       !== undefined) updates['blurb']              = String(payload.blurb);
-      if (payload.mode        !== undefined) updates['mode']               = String(payload.mode);
-      if (bucketsToSave       !== undefined) updates['buckets_json']       = JSON.stringify(bucketsToSave);
-      if (payload.resultsVisibility !== undefined) updates['results_visibility'] = String(payload.resultsVisibility);
-      if (payload.anonymous   !== undefined) updates['anonymous']          = String(!!payload.anonymous);
-      if (payload.adminEmails !== undefined) updates['admin_emails']       = Array.isArray(payload.adminEmails) ? payload.adminEmails.join('\n') : String(payload.adminEmails);
-
-      rows.forEach(function(row, i) {
-        const key = String(row[0]);
-        if (updates[key] !== undefined) {
-          sheet.getRange(i + 2, 2).setValue(updates[key]);
-        }
-      });
+    // --- When switching Top-N → MoSCoW with empty/no buckets, re-seed MoSCoW defaults ---
+    let bucketsToSave = payload.buckets;
+    if (modeChanging && newMode === 'moscow' && (!bucketsToSave || bucketsToSave.length === 0)) {
+      bucketsToSave = DEFAULT_BUCKETS;
     }
+
+    const updates = {};
+    if (payload.title       !== undefined) updates['title']              = String(payload.title);
+    if (payload.subtitle    !== undefined) updates['subtitle']           = String(payload.subtitle);
+    if (payload.blurb       !== undefined) updates['blurb']              = String(payload.blurb);
+    if (payload.mode        !== undefined) updates['mode']               = String(payload.mode);
+    if (bucketsToSave       !== undefined) updates['buckets_json']       = JSON.stringify(bucketsToSave);
+    if (payload.resultsVisibility !== undefined) updates['results_visibility'] = String(payload.resultsVisibility);
+    if (payload.anonymous   !== undefined) updates['anonymous']          = String(!!payload.anonymous);
+    if (payload.adminEmails !== undefined) updates['admin_emails']       = Array.isArray(payload.adminEmails) ? payload.adminEmails.join('\n') : String(payload.adminEmails);
+
+    rows.forEach(function(row, i) {
+      const key = String(row[0]);
+      if (updates[key] !== undefined) {
+        sheet.getRange(i + 2, 2).setValue(updates[key]);
+      }
+    });
 
     // --- Write items to Items sheet if provided ---
     if (payload.items !== undefined) {
