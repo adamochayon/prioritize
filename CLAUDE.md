@@ -11,6 +11,7 @@ Single-file Google Apps Script web app for force-ranking team priorities into bu
 - `src/appsscript.json` — runtime manifest.
 - `docs/` — user-facing docs (configuration, modes, customizing).
 - `examples/` — example item sets.
+- `scripts/setup.mjs` — idempotent clasp install flow. Dev tooling, not runtime.
 
 ## Architecture in 5 bullets
 
@@ -55,3 +56,4 @@ Single-file Google Apps Script web app for force-ranking team priorities into bu
 - When a UI string is configurable (title, subtitle, blurb), update `DEFAULT_CONFIG` — both the installer and the runtime fallback read from it.
 - Sheet-side setup is one-shot: `ensureInstalled_()` runs on the first request after deploy (gated on `ScriptProperties.INSTALLED_AT`) and is a no-op thereafter. Getters (`getConfigSheet_`, etc.) are pure — they do not seed or repair.
 - Do not commit `.clasp.json` (it's gitignored). Do not commit changes to `src/appsscript.json` timezone — that's a per-deploy choice.
+- Install/update flow is in `scripts/setup.mjs`. It's idempotent — same command for first-time setup and for redeploys. Prefer editing it over adding new install scripts.

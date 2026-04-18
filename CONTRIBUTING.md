@@ -4,18 +4,18 @@ Thanks for your interest. Contributions are welcome — bug fixes, docs improvem
 
 ## How the project works
 
-Prioritize is a Google Apps Script web app. There is no build step, no npm, and no local server. All source lives in `src/`. The app is deployed directly to Google's infrastructure via the Apps Script editor or [clasp](https://github.com/google/clasp).
+Prioritize is a Google Apps Script web app. There is no build step, no framework, and no local server. All runtime source lives in `src/`; `scripts/setup.mjs` is a small Node helper that wraps [clasp](https://github.com/google/clasp) for install and redeploy. The app is deployed directly to Google's infrastructure.
 
 Because Apps Script can't run outside Google, **there are no automated tests**. All verification is done by deploying and clicking through the UI.
 
-## Setup (clasp approach)
+## Setup (recommended)
 
 1. Fork this repo and clone it locally.
-2. Install clasp: `npm install -g @google/clasp`
-3. Log in: `clasp login`
-4. Copy `.clasp.json.example` to `.clasp.json` and replace `YOUR_SCRIPT_ID_HERE` with your own script ID (create a new project at [script.google.com](https://script.google.com) to get one).
-5. Push source to your Apps Script project: `clasp push`
-6. Deploy as a web app from the Apps Script editor (see [README.md](README.md) step 4).
+2. Node 22+ is required. With [nvm](https://github.com/nvm-sh/nvm): `nvm use` picks up `.nvmrc`. Without nvm: install Node 22+ from [nodejs.org](https://nodejs.org).
+3. `npm install && npm run setup` — creates your own Apps Script project and deploys it.
+4. Edit files in `src/`. Run `npm run setup` again to push + redeploy. Or use `npm run push` / `npm run deploy` for the finer-grained steps.
+
+To start from a clean project (e.g. to test first-run behavior): delete `.clasp.json` and re-run `npm run setup`. This creates a **separate** Apps Script project and a second backing Sheet — the existing one is not touched.
 
 ## Setup (no clasp)
 

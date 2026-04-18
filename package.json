@@ -1,0 +1,31 @@
+{
+  "name": "prioritize",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Google Apps Script tool for force-ranking team priorities.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "push": "clasp push",
+    "deploy": "clasp deploy",
+    "open": "clasp open-script",
+    "format": "prettier --write 'src/**/*.{html,gs}' 'scripts/**/*.mjs'",
+    "format:check": "prettier --check 'src/**/*.{html,gs}' 'scripts/**/*.mjs'",
+    "lint:html": "html-validate 'src/**/*.html'",
+    "validate": "node scripts/validate.mjs",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@google/clasp": "3.3.0",
+    "ajv": "8.18.0",
+    "html-validate": "9.7.1",
+    "husky": "9.1.7",
+    "lint-staged": "15.5.2",
+    "prettier": "3.8.3"
+  },
+  "lint-staged": {
+    "scripts/**/*.mjs": "prettier --write"
+  }
+}

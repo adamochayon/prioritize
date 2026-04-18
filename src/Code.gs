@@ -252,7 +252,8 @@ function getWorkbook_() {
     }
   }
   if (!id) {
-    ss = SpreadsheetApp.create('Prioritize — Submissions');
+    const projectName = DriveApp.getFileById(ScriptApp.getScriptId()).getName();
+    ss = SpreadsheetApp.create(projectName);
     props.setProperty('SHEET_ID', ss.getId());
   }
   return ss;

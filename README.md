@@ -10,14 +10,27 @@ Google Forms can collect votes but can't do drag-to-bucket ranking. Survey tools
 
 ## Features
 
-- 5 files of Apps Script — no CLI, no npm, no server
+- 5 files of Apps Script — no build step, no server, no framework
 - Backed by Google Workspace identity; every vote tied to a real Google account
 - Domain-restricted by default; results stay inside your org
 - Two modes: MoSCoW (Must / Should / Could / Won't) and Top-N
 - Scores aggregate across all voters; ties broken by standard deviation
 - Items, buckets, and config live in an editable Google Sheet
 
-## Deploy (3 minutes)
+## Deploy
+
+**Fastest** — clone and run `npm install && npm run setup`. One command, Node 22+, ~1 minute. The script signs you in, creates an Apps Script project in your Drive, pushes the source, deploys as a web app, and prints the URL.
+
+**No tools needed** — copy-paste the 5 files in `src/` into a new Apps Script project. ~2 minutes, works with just a browser.
+
+### Quick install (recommended)
+
+1. `git clone https://github.com/adamochayon/prioritize.git && cd prioritize`
+2. Enable the Apps Script API once at [script.google.com/home/usersettings](https://script.google.com/home/usersettings).
+3. Use Node 22+. If you have [nvm](https://github.com/nvm-sh/nvm), run `nvm use` (reads `.nvmrc`). Otherwise install Node 22+ from [nodejs.org](https://nodejs.org).
+4. `npm install && npm run setup` — follow the browser prompts.
+
+### Manual install
 
 1. Go to [script.google.com](https://script.google.com) and click **New project**.
 2. In the left sidebar, click the gear icon (Project settings) and check **"Show `appsscript.json` manifest file in editor"**.
@@ -50,7 +63,9 @@ See [docs/customizing.md](docs/customizing.md).
 
 ## Updating after code changes
 
-Deploy → **Manage deployments** → pencil icon → set **Version** to **New version** → Deploy. If you redeploy without bumping the version, users get the cached old version.
+If you used `npm run setup`: run it again — it detects your existing project and pushes + redeploys.
+
+Manual users: Deploy → Manage deployments → pencil → Version: New version → Deploy. Skipping the version bump serves users the stale HTML.
 
 ## Finding the backing sheet
 
