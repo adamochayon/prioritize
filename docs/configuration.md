@@ -11,7 +11,7 @@ The `Config` sheet has two columns: `key` and `value`. The recognized keys are:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `title` | string | `Prioritize` | Heading text shown at the top of the rank view. |
-| `subtitle` | string | `Rank the items below` | Secondary line shown below the blurb. Leave blank to omit. |
+| `subtitle` | string | *(empty)* | Optional secondary line shown under the title. Leave blank to omit. |
 | `blurb` | string | *(built-in instruction text)* | Instructional paragraph shown above the ranking UI. Overwrite with your own framing for the exercise. |
 | `mode` | string | `moscow` | Ranking mode. Accepted values: `moscow` or `topn`. See [modes](./modes.md). |
 | `buckets_json` | JSON string | *(MoSCoW defaults)* | JSON array defining the buckets for the current mode. Managed automatically when you switch modes via the Admin view. See [modes](./modes.md) for the schema. |
