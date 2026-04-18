@@ -47,7 +47,28 @@ const DEFAULT_BLURB = 'More priorities than bandwidth — this exercise forces e
 
 // ---------- Web app entry ------------------------------------------------
 
+function isAdmin_() {
+  try {
+    const me = normalizeEmail_(Session.getActiveUser().getEmail());
+    if (!me) return false;
+    const cfg = getConfigFromSheet_();
+    const admins = (cfg.adminEmails || []).map(function(e) { return String(e).trim().toLowerCase(); });
+    return admins.indexOf(me) !== -1;
+  } catch (e) {
+    return false;
+  }
+}
+
 function doGet(e) {
+  const v = e && e.parameter && e.parameter.v;
+  if (v === 'admin') {
+    const template = isAdmin_() ? 'Admin' : 'NotAuthorized';
+    return HtmlService.createTemplateFromFile(template)
+      .evaluate()
+      .setTitle('Prioritize')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
   return HtmlService.createTemplateFromFile('Index')
     .evaluate()
     .setTitle('Prioritize')
@@ -340,8 +361,10 @@ function getItemsFromSheet_() {
 // ---------- Config writer ------------------------------------------------
 
 // Writes config values back to the Config sheet.
-// No admin gating in this task — another task (F2) wires that.
 function saveConfig(payload) {
+  if (!isAdmin_()) {
+    throw new Error('Not authorized — admin access required.');
+  }
   if (!payload || typeof payload !== 'object') throw new Error('Invalid payload');
 
   const sheet = getConfigSheet_();
@@ -414,7 +437,7 @@ function getBoot() {
     config: getConfig_(),
     me: me,
     mySubmission: findSubmissionByEmail_(me.email),
-    isAdmin: false,
+    isAdmin: isAdmin_(),
   };
 }
 
