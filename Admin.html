@@ -5,14 +5,692 @@
   <base target="_top">
   <title>Prioritize · Admin</title>
   <style>
-    body { font-family: -apple-system, system-ui, sans-serif; background: #0d0f12; color: #e6e6e6; padding: 40px; max-width: 720px; margin: 0 auto; }
-    a { color: #4ade80; }
-    code { background: #15181d; padding: 2px 6px; border: 1px solid #23272e; }
+    :root {
+      --bg: #0d0f12;
+      --bg-elev: #15181d;
+      --border: #23272e;
+      --text: #e6e6e6;
+      --muted: #888;
+      --accent: #4ade80;
+      --accent-dim: rgba(74, 222, 128, 0.18);
+      --accent-dim2: rgba(74, 222, 128, 0.08);
+      --danger: #f87171;
+      --should-color: rgba(74, 222, 128, 0.45);
+      --could-color: #555;
+      --wont-color: rgba(248, 113, 113, 0.5);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
+    }
+    .mono {
+      font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 20px 80px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+    .section-label {
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .notice {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .notice.success { border-color: var(--accent); color: var(--accent); }
+    .notice.error   { border-color: var(--danger); color: var(--danger); }
+
+    /* Results */
+    .result-row {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .result-head {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .result-rank {
+      color: var(--accent);
+      font-size: 16px;
+      min-width: 28px;
+    }
+    .result-name { flex: 1; }
+    .result-score { color: var(--accent); }
+    .result-meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-left: 6px;
+    }
+    .dist-bar {
+      height: 4px;
+      display: flex;
+      margin: 6px 0 0 38px;
+      max-width: calc(100% - 38px);
+      overflow: hidden;
+    }
+    .dist-segment { height: 100%; }
+    .dist-segment.must   { background: var(--accent); }
+    .dist-segment.should { background: var(--should-color); }
+    .dist-segment.could  { background: var(--could-color); }
+    .dist-segment.wont   { background: var(--wont-color); }
+    .voter-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-left: 38px;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .voter-chip .voter-name { color: #aaa; }
+    .voter-chip .bucket-letter { font-weight: 700; }
+    .voter-chip .bucket-letter.must   { color: var(--accent); }
+    .voter-chip .bucket-letter.should { color: var(--should-color); }
+    .voter-chip .bucket-letter.could  { color: var(--muted); }
+    .voter-chip .bucket-letter.wont   { color: var(--danger); }
+
+    details.submissions {
+      margin-top: 32px;
+      color: var(--muted);
+    }
+    details.submissions summary { cursor: pointer; }
+    details.submissions .submission {
+      margin: 12px 0;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+    }
+    details.submissions .submission h4 {
+      margin: 0 0 8px;
+      color: var(--text);
+      font-size: 14px;
+    }
+    .sub-bucket-group { margin-bottom: 8px; }
+    .sub-bucket-label {
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    .sub-bucket-items {
+      margin: 0;
+      padding: 0 0 0 12px;
+      list-style: disc;
+    }
+    .sub-bucket-items li { margin: 1px 0; font-size: 13px; }
+
+    .loading { color: var(--muted); padding: 20px 0; }
+    .hidden { display: none !important; }
+
+    /* Admin-specific */
+    .view-link {
+      font-size: 13px;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .view-link:hover { text-decoration: underline; }
+
+    .data-strip {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 14px;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      margin-bottom: 28px;
+      font-size: 13px;
+      flex-wrap: wrap;
+    }
+    .data-strip .stat { color: var(--muted); }
+    .data-strip .stat strong { color: var(--text); font-variant-numeric: tabular-nums; }
+    .data-strip .spacer { flex: 1; }
+    .sheet-link {
+      font-size: 13px;
+      color: var(--accent);
+      text-decoration: none;
+      border: 1px solid var(--accent);
+      padding: 6px 12px;
+      white-space: nowrap;
+    }
+    .sheet-link:hover { background: var(--accent-dim2); }
+
+    .admin-section {
+      border-top: 1px solid var(--border);
+      padding-top: 28px;
+      margin-top: 28px;
+    }
+    .admin-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin: 0 0 20px;
+    }
+
+    .config-form {
+      max-width: 640px;
+    }
+    .field {
+      margin-bottom: 18px;
+    }
+    .field label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .field input[type="text"],
+    .field input[type="number"],
+    .field textarea {
+      display: block;
+      width: 100%;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      padding: 8px 10px;
+      outline: none;
+    }
+    .field input[type="text"]:focus,
+    .field input[type="number"]:focus,
+    .field textarea:focus {
+      border-color: var(--accent);
+    }
+    .field textarea { resize: vertical; }
+    .field input[type="number"] { max-width: 100px; }
+
+    .radio-group {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .radio-group label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .radio-group input[type="radio"] { accent-color: var(--accent); cursor: pointer; }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .checkbox-label input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; width: 16px; height: 16px; }
+
+    .caps-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .cap-field label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .cap-field input {
+      display: block;
+      width: 100%;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      padding: 8px 10px;
+      outline: none;
+    }
+    .cap-field input:focus { border-color: var(--accent); }
+
+    .save-btn {
+      background: var(--accent);
+      color: #0d0f12;
+      border: none;
+      font: inherit;
+      font-weight: 600;
+      padding: 12px 24px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .save-btn:hover:not(:disabled) { filter: brightness(1.1); }
+
+    .warning-text {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    @media (max-width: 600px) {
+      .caps-grid { grid-template-columns: repeat(2, 1fr); }
+      .data-strip { flex-direction: column; align-items: flex-start; }
+    }
   </style>
 </head>
 <body>
-  <h1>Admin</h1>
-  <p>Placeholder admin page. The real admin UI is implemented in a later task.</p>
-  <p><a href="?">← Back to ranking</a></p>
+  <main>
+    <header>
+      <h1 id="page-title">Admin</h1>
+      <a href="?" class="view-link">View ranking &rarr;</a>
+    </header>
+
+    <div id="boot-loading" class="loading">Loading&hellip;</div>
+    <div id="boot-error" class="notice error hidden"></div>
+
+    <div id="admin-body" class="hidden">
+
+      <!-- Data strip -->
+      <div class="data-strip">
+        <span class="stat">Submissions: <strong id="stat-submissions">0</strong></span>
+        <span class="stat">Items: <strong id="stat-items">0</strong></span>
+        <span class="spacer"></span>
+        <a id="sheet-link" href="#" target="_blank" class="sheet-link">Open backing Google Sheet &uarr;</a>
+      </div>
+
+      <!-- Config form -->
+      <div class="config-form">
+        <div class="section-label">Configuration</div>
+
+        <div class="field">
+          <label for="cfg-title">Title</label>
+          <input type="text" id="cfg-title">
+        </div>
+
+        <div class="field">
+          <label for="cfg-subtitle">Subtitle</label>
+          <input type="text" id="cfg-subtitle">
+        </div>
+
+        <div class="field">
+          <label for="cfg-blurb">Blurb</label>
+          <textarea id="cfg-blurb" rows="4"></textarea>
+        </div>
+
+        <div class="field">
+          <label>Mode</label>
+          <div class="radio-group">
+            <label><input type="radio" name="mode" value="moscow"> MoSCoW</label>
+            <label><input type="radio" name="mode" value="topn"> Top-N</label>
+          </div>
+        </div>
+
+        <div class="field" id="topn-field" style="display:none">
+          <label for="cfg-topn">N (how many items count as "Top")</label>
+          <input type="number" id="cfg-topn" min="1" max="20" value="5">
+        </div>
+
+        <div class="field" id="caps-field">
+          <label>Bucket caps</label>
+          <div class="caps-grid">
+            <div class="cap-field">
+              <label for="cap-must">Must have</label>
+              <input type="number" id="cap-must" min="0" max="99">
+            </div>
+            <div class="cap-field">
+              <label for="cap-should">Should have</label>
+              <input type="number" id="cap-should" min="0" max="99">
+            </div>
+            <div class="cap-field">
+              <label for="cap-could">Could have</label>
+              <input type="number" id="cap-could" min="0" max="99">
+            </div>
+            <div class="cap-field">
+              <label for="cap-wont">Won't have</label>
+              <input type="number" id="cap-wont" min="0" max="99">
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Results visibility</label>
+          <div class="radio-group">
+            <label><input type="radio" name="results_visibility" value="always"> Always</label>
+            <label><input type="radio" name="results_visibility" value="after_submit"> After you submit</label>
+            <label><input type="radio" name="results_visibility" value="admin_only"> Admin only</label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="checkbox-label">
+            <input type="checkbox" id="cfg-anonymous">
+            Hide submitter names in results
+          </label>
+        </div>
+
+        <div class="field">
+          <label for="cfg-admin-emails">Admin emails (one per line)</label>
+          <textarea id="cfg-admin-emails" rows="4"></textarea>
+          <p class="warning-text">Removing yourself from this list will lock you out of the admin view immediately.</p>
+        </div>
+
+        <div id="save-notice" class="notice hidden"></div>
+        <button class="save-btn" id="save-btn">Save config</button>
+      </div>
+
+      <!-- Results section -->
+      <div class="admin-section">
+        <div class="admin-section-title">Results</div>
+        <div id="results-content" class="loading">Loading results&hellip;</div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    var boot = null;
+
+    // ---------- Boot -------------------------------------------------------
+
+    google.script.run
+      .withSuccessHandler(onAdminBoot)
+      .withFailureHandler(onError)
+      .getAdminBoot();
+
+    function onAdminBoot(data) {
+      boot = data;
+      document.getElementById('boot-loading').classList.add('hidden');
+      document.getElementById('admin-body').classList.remove('hidden');
+
+      document.getElementById('page-title').textContent = 'Admin · ' + (data.config.title || 'Prioritize');
+      document.getElementById('stat-submissions').textContent = data.stats.submissionCount;
+      document.getElementById('stat-items').textContent = data.stats.itemCount;
+      document.getElementById('sheet-link').href = data.sheetUrl;
+
+      populateForm(data.config);
+      loadResults();
+    }
+
+    function onError(err) {
+      document.getElementById('boot-loading').classList.add('hidden');
+      var el = document.getElementById('boot-error');
+      el.textContent = (err && err.message) || 'Failed to load.';
+      el.classList.remove('hidden');
+    }
+
+    // ---------- Form population --------------------------------------------
+
+    function populateForm(cfg) {
+      document.getElementById('cfg-title').value    = cfg.title    || '';
+      document.getElementById('cfg-subtitle').value = cfg.subtitle || '';
+      document.getElementById('cfg-blurb').value    = cfg.blurb    || '';
+
+      var mode = cfg.mode || 'moscow';
+      document.querySelectorAll('input[name="mode"]').forEach(function(r) {
+        r.checked = r.value === mode;
+      });
+      updateModeUI(mode, cfg.buckets);
+
+      var rv = cfg.resultsVisibility || 'always';
+      document.querySelectorAll('input[name="results_visibility"]').forEach(function(r) {
+        r.checked = r.value === rv;
+      });
+
+      document.getElementById('cfg-anonymous').checked = !!cfg.anonymous;
+
+      document.getElementById('cfg-admin-emails').value =
+        (cfg.adminEmails || []).join('\n');
+    }
+
+    function updateModeUI(mode, buckets) {
+      var isMoscow = mode !== 'topn';
+      document.getElementById('caps-field').style.display  = isMoscow ? '' : 'none';
+      document.getElementById('topn-field').style.display  = isMoscow ? 'none' : '';
+
+      if (isMoscow && buckets) {
+        var capMap = {};
+        buckets.forEach(function(b) { capMap[b.id] = b.cap; });
+        var mustEl   = document.getElementById('cap-must');
+        var shouldEl = document.getElementById('cap-should');
+        var couldEl  = document.getElementById('cap-could');
+        var wontEl   = document.getElementById('cap-wont');
+        if (mustEl)   mustEl.value   = capMap['must']   != null ? capMap['must']   : 3;
+        if (shouldEl) shouldEl.value = capMap['should'] != null ? capMap['should'] : 4;
+        if (couldEl)  couldEl.value  = capMap['could']  != null ? capMap['could']  : 4;
+        if (wontEl)   wontEl.value   = capMap['wont']   != null ? capMap['wont']   : 5;
+      }
+
+      if (!isMoscow && buckets) {
+        var topBucket = buckets.find(function(b) { return b.id === 'top'; });
+        if (topBucket && topBucket.cap) {
+          document.getElementById('cfg-topn').value = topBucket.cap;
+        }
+      }
+    }
+
+    document.querySelectorAll('input[name="mode"]').forEach(function(r) {
+      r.addEventListener('change', function() {
+        updateModeUI(r.value, null);
+      });
+    });
+
+    // ---------- Save -------------------------------------------------------
+
+    document.getElementById('save-btn').addEventListener('click', function() {
+      var btn = document.getElementById('save-btn');
+      btn.disabled = true;
+
+      var mode = document.querySelector('input[name="mode"]:checked');
+      mode = mode ? mode.value : 'moscow';
+
+      var buckets;
+      if (mode === 'topn') {
+        var n = parseInt(document.getElementById('cfg-topn').value, 10);
+        if (!(n > 0)) n = 5;
+        buckets = [
+          { id: 'top',  label: 'Top ' + n, weight: 1, cap: n },
+          { id: 'rest', label: 'Rest',      weight: 0, cap: null },
+        ];
+      } else {
+        var mustCap   = parseInt(document.getElementById('cap-must').value,   10) || 3;
+        var shouldCap = parseInt(document.getElementById('cap-should').value, 10) || 4;
+        var couldCap  = parseInt(document.getElementById('cap-could').value,  10) || 4;
+        var wontCap   = parseInt(document.getElementById('cap-wont').value,   10) || 5;
+        buckets = [
+          { id: 'must',   label: 'Must have',   weight: 12, cap: mustCap   },
+          { id: 'should', label: 'Should have', weight: 6,  cap: shouldCap },
+          { id: 'could',  label: 'Could have',  weight: 2,  cap: couldCap  },
+          { id: 'wont',   label: "Won't have",  weight: 0,  cap: wontCap   },
+        ];
+      }
+
+      var rvEl = document.querySelector('input[name="results_visibility"]:checked');
+      var rv = rvEl ? rvEl.value : 'always';
+
+      var adminRaw = document.getElementById('cfg-admin-emails').value;
+      var adminEmails = adminRaw
+        .split(/[\n,\s]+/)
+        .map(function(s) { return s.trim().toLowerCase(); })
+        .filter(function(s) { return s.length > 0; });
+
+      var payload = {
+        title:             document.getElementById('cfg-title').value,
+        subtitle:          document.getElementById('cfg-subtitle').value,
+        blurb:             document.getElementById('cfg-blurb').value,
+        mode:              mode,
+        buckets:           buckets,
+        resultsVisibility: rv,
+        anonymous:         document.getElementById('cfg-anonymous').checked,
+        adminEmails:       adminEmails,
+      };
+
+      google.script.run
+        .withSuccessHandler(onSaved)
+        .withFailureHandler(onSaveError)
+        .saveConfig(payload);
+    });
+
+    function onSaved() {
+      document.getElementById('save-btn').disabled = false;
+      showSaveNotice('Saved.', 'success');
+    }
+
+    function onSaveError(err) {
+      document.getElementById('save-btn').disabled = false;
+      showSaveNotice((err && err.message) || 'Save failed.', 'error');
+    }
+
+    function showSaveNotice(msg, type) {
+      var el = document.getElementById('save-notice');
+      el.className = 'notice ' + (type || '');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      if (type === 'success') {
+        setTimeout(function() { el.classList.add('hidden'); }, 3000);
+      }
+    }
+
+    // ---------- Results ----------------------------------------------------
+
+    function loadResults() {
+      var el = document.getElementById('results-content');
+      el.className = 'loading';
+      el.textContent = 'Loading results\u2026';
+      google.script.run
+        .withSuccessHandler(renderResults)
+        .withFailureHandler(function(err) {
+          el.className = '';
+          el.innerHTML = '<div class="notice error">' + escapeHtml((err && err.message) || 'Failed to load results.') + '</div>';
+        })
+        .getResults();
+    }
+
+    var BUCKET_LETTER = { must: 'M', should: 'S', could: 'C', wont: 'W', top: 'T', rest: 'R' };
+
+    function renderResults(data) {
+      var el = document.getElementById('results-content');
+      el.className = '';
+
+      if (data.gated) {
+        el.innerHTML = '<div class="notice">' + escapeHtml('Results gated: ' + data.gated) + '</div>';
+        return;
+      }
+
+      if (!data.submissions || data.submissions.length === 0) {
+        el.innerHTML = '<div class="notice">No submissions yet.</div>';
+        return;
+      }
+
+      var cfg = (boot && boot.config) || {};
+      var buckets = cfg.buckets || [];
+      var items = cfg.buckets ? null : [];
+
+      var voterCount = data.submissions.length;
+      var itemsHtml = data.items.map(function(item, idx) {
+        var chips = item.voters.map(function(v) {
+          var letter = BUCKET_LETTER[v.bucket] || v.bucket;
+          return '<span class="voter-chip"><span class="voter-name">' + escapeHtml(v.voter) + '</span> <span class="bucket-letter ' + escapeHtml(v.bucket) + ' mono">' + escapeHtml(letter) + '</span></span>';
+        }).join('');
+        var stdev = item.stdev ? '<span class="result-meta mono">\u03c3 ' + item.stdev.toFixed(1) + '</span>' : '';
+        var totalVoters = item.voters.length || 1;
+        var distBar = buckets.map(function(b) {
+          var pct = ((item.bucketCounts[b.id] || 0) / totalVoters) * 100;
+          return pct > 0 ? '<div class="dist-segment ' + escapeHtml(b.id) + '" style="width:' + pct + '%"></div>' : '';
+        }).join('');
+        return '<div class="result-row">' +
+          '<div class="result-head">' +
+          '<span class="result-rank mono">' + (idx + 1) + '</span>' +
+          '<span class="result-name">' + escapeHtml(item.name) + '</span>' +
+          '<span class="result-score mono">' + item.score + '</span>' +
+          stdev +
+          '</div>' +
+          '<div class="dist-bar">' + distBar + '</div>' +
+          '<div class="voter-chips">' + (chips || '<span>no votes</span>') + '</div>' +
+          '</div>';
+      }).join('');
+
+      var subs = renderSubmissions(data.submissions, buckets, cfg.items || []);
+
+      el.innerHTML =
+        '<div class="section-label">' + voterCount + ' submission' + (voterCount === 1 ? '' : 's') + '</div>' +
+        itemsHtml +
+        subs;
+    }
+
+    function renderSubmissions(subs, buckets, cfgItems) {
+      var itemById = {};
+      (cfgItems || []).forEach(function(i) { itemById[i.id] = i.name; });
+      var sorted = subs.slice().sort(function(a, b) { return new Date(b.submittedAt) - new Date(a.submittedAt); });
+      var rows = sorted.map(function(s) {
+        var a = s.assignments || {};
+        var groups = buckets.map(function(b) {
+          var names = Object.keys(a)
+            .filter(function(id) { return a[id] === b.id; })
+            .map(function(id) { return escapeHtml(itemById[id] || id); });
+          if (!names.length) return '';
+          return '<div class="sub-bucket-group">' +
+            '<div class="sub-bucket-label">' + escapeHtml(b.label) + '</div>' +
+            '<ul class="sub-bucket-items">' + names.map(function(n) { return '<li>' + n + '</li>'; }).join('') + '</ul>' +
+            '</div>';
+        }).join('');
+        return '<div class="submission">' +
+          '<h4>' + escapeHtml(s.displayName || s.email) + ' <span class="result-meta">' + escapeHtml(fmtTime(s.submittedAt)) + '</span></h4>' +
+          groups +
+          '</div>';
+      }).join('');
+
+      return '<details class="submissions"><summary>Individual submissions (' + subs.length + ')</summary>' + rows + '</details>';
+    }
+
+    // ---------- Utilities --------------------------------------------------
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function fmtTime(iso) {
+      if (!iso) return '';
+      var d = new Date(iso);
+      if (isNaN(d)) return '';
+      var now = new Date();
+      var sameDay = d.toDateString() === now.toDateString();
+      if (sameDay) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' +
+             d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+  </script>
 </body>
 </html>
