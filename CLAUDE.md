@@ -4,25 +4,25 @@ Single-file Google Apps Script web app for force-ranking team priorities into bu
 
 ## Repo layout
 
-- `Code.gs` — backend. Single file, global namespace.
-- `Index.html` — main UI (Rank + Results views). Inline CSS + JS.
-- `Admin.html` — admin UI (config form + results pane).
-- `NotAuthorized.html` — shown to non-admins hitting `?v=admin`.
-- `appsscript.json` — runtime manifest.
+- `src/Code.gs` — backend. Single file, global namespace.
+- `src/Index.html` — main UI (Rank + Results views). Inline CSS + JS.
+- `src/Admin.html` — admin UI (config form + results pane).
+- `src/NotAuthorized.html` — shown to non-admins hitting `?v=admin`.
+- `src/appsscript.json` — runtime manifest.
 - `docs/` — user-facing docs (configuration, modes, customizing).
 - `examples/` — example item sets.
 
 ## Architecture in 5 bullets
 
 - Google Apps Script web app. No build step, no npm, no framework.
-- Backend is one `Code.gs` file with shared global namespace. V8 runtime (roughly ES2020).
+- Backend is one `src/Code.gs` file with shared global namespace. V8 runtime (roughly ES2020).
 - Client calls server via `google.script.run.<fn>()` — callback-based, not promises.
 - State lives in a single Google Sheet with three tabs: `Submissions`, `Config`, `Items`. Script auto-creates it on first run and stashes the ID in `PropertiesService`.
 - Two modes (MoSCoW, Top-N) selected via Config sheet. Buckets and weights are data, not code.
 
 ## Entry points worth knowing
 
-- `doGet(e)` — routes `?v=admin` to `Admin.html` or `NotAuthorized.html`; everything else to `Index.html`.
+- `doGet(e)` — routes `?v=admin` to `src/Admin.html` or `src/NotAuthorized.html`; everything else to `src/Index.html`.
 - `getBoot()` — single call the Index UI makes on load (config + identity + prior submission + isAdmin).
 - `getAdminBoot()` — single call the Admin UI makes on load.
 - `saveSubmission(payload)` — validates then upserts by email under `LockService`.
@@ -43,8 +43,8 @@ Single-file Google Apps Script web app for force-ranking team priorities into bu
 ## Conventions in this codebase
 
 - Trailing-underscore functions (`foo_`) are private by convention — not called from the client.
-- Config defaults live in one place: `DEFAULT_CONFIG` at the top of `Code.gs`. `ensureInstalled_` seeds from it and `getConfig_` falls back to it.
-- Dark terminal aesthetic. CSS variables at the top of `Index.html` (`--bg`, `--accent`, etc.) — reuse them rather than hard-coding colors.
+- Config defaults live in one place: `DEFAULT_CONFIG` at the top of `src/Code.gs`. `ensureInstalled_` seeds from it and `getConfig_` falls back to it.
+- Dark terminal aesthetic. CSS variables at the top of `src/Index.html` (`--bg`, `--accent`, etc.) — reuse them rather than hard-coding colors.
 - Bucket ids (`must`, `should`, `could`, `wont`) are hard-coded in some CSS selectors (`.bucket[data-bucket-id="must"]`). If you add new bucket ids you'll need to update those too.
 
 ## Working on this repo
@@ -54,4 +54,4 @@ Single-file Google Apps Script web app for force-ranking team priorities into bu
 - Keep changes minimal and scoped. No speculative refactors.
 - When a UI string is configurable (title, subtitle, blurb), update `DEFAULT_CONFIG` — both the installer and the runtime fallback read from it.
 - Sheet-side setup is one-shot: `ensureInstalled_()` runs on the first request after deploy (gated on `ScriptProperties.INSTALLED_AT`) and is a no-op thereafter. Getters (`getConfigSheet_`, etc.) are pure — they do not seed or repair.
-- Do not commit `.clasp.json` (it's gitignored). Do not commit changes to `appsscript.json` timezone — that's a per-deploy choice.
+- Do not commit `.clasp.json` (it's gitignored). Do not commit changes to `src/appsscript.json` timezone — that's a per-deploy choice.

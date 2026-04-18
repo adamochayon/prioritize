@@ -77,7 +77,7 @@ The practical implication: results during and after a mode switch will be incomp
 
 Custom bucket schemes are deliberately not supported in the UI. The intent is to keep the tool focused on two well-defined workflows.
 
-If you need a custom scheme, fork the project and edit `DEFAULT_BUCKETS` in `Code.gs`. Be aware that bucket ids are not purely data — the CSS in `Index.html` has hardcoded color rules keyed to the known bucket ids:
+If you need a custom scheme, fork the project and edit `DEFAULT_BUCKETS` in `src/Code.gs`. Be aware that bucket ids are not purely data — the CSS in `src/Index.html` has hardcoded color rules keyed to the known bucket ids:
 
 ```css
 .bucket[data-bucket-id="must"]   { border-left: 3px solid var(--accent); }

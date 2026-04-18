@@ -22,10 +22,10 @@ Google Forms can collect votes but can't do drag-to-bucket ranking. Survey tools
 1. Go to [script.google.com](https://script.google.com) and click **New project**.
 2. In the left sidebar, click the gear icon (Project settings) and check **"Show `appsscript.json` manifest file in editor"**.
 3. Paste the contents of each file from this repo into the editor:
-   - Replace the default `Code.gs` content with the repo's `Code.gs`.
-   - Add an HTML file named `Index` and paste `Index.html` into it (Apps Script appends `.html` automatically).
-   - Add HTML files for `Admin` and `NotAuthorized` the same way.
-   - Replace `appsscript.json` with the repo's version.
+   - Replace the default `Code.gs` content with the repo's `src/Code.gs`.
+   - Add an HTML file named `Index` and paste `src/Index.html` into it (Apps Script appends `.html` automatically).
+   - Add HTML files for `Admin` and `NotAuthorized` the same way (from `src/Admin.html` and `src/NotAuthorized.html`).
+   - Replace `appsscript.json` with the repo's `src/appsscript.json`.
 4. Click **Deploy → New deployment → Web app**:
    - **Execute as:** Me
    - **Who has access:** Anyone within [your organization] (recommended) or Anyone with a Google account

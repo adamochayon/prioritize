@@ -8,11 +8,11 @@ This document is for developers who want to fork and modify Prioritize.
 
 | File | Purpose |
 |------|---------|
-| `Code.gs` | Entire backend. Sheet plumbing, config/items readers and writers, submission logic, aggregation, and all `google.script.run`-callable functions. |
-| `Index.html` | Rank and results UI. Contains inline CSS and JS. Rendered via `HtmlService` templating. |
-| `Admin.html` | Admin view served at `?v=admin`. Config editor and items editor. |
-| `NotAuthorized.html` | Fallback page shown when a non-admin requests `?v=admin`. |
-| `appsscript.json` | Apps Script manifest. Declares OAuth scopes, webapp entry point, and runtime version. |
+| `src/Code.gs` | Entire backend. Sheet plumbing, config/items readers and writers, submission logic, aggregation, and all `google.script.run`-callable functions. |
+| `src/Index.html` | Rank and results UI. Contains inline CSS and JS. Rendered via `HtmlService` templating. |
+| `src/Admin.html` | Admin view served at `?v=admin`. Config editor and items editor. |
+| `src/NotAuthorized.html` | Fallback page shown when a non-admin requests `?v=admin`. |
+| `src/appsscript.json` | Apps Script manifest. Declares OAuth scopes, webapp entry point, and runtime version. |
 
 ---
 
@@ -29,7 +29,7 @@ Each instance of Prioritize is a standalone Apps Script web app deployment backe
 **Steps to deploy:**
 
 1. Create a new Apps Script project at [script.google.com](https://script.google.com).
-2. Copy `Code.gs`, `Index.html`, `Admin.html`, `NotAuthorized.html`, and `appsscript.json` into the project.
+2. Copy `src/Code.gs`, `src/Index.html`, `src/Admin.html`, `src/NotAuthorized.html`, and `src/appsscript.json` into the project.
 3. Click **Deploy → New deployment → Web app**.
    - Execute as: **Me** (required — the script accesses Drive on behalf of the deployer).
    - Who has access: **Anyone within [your domain]** for org-internal use, or **Anyone with a Google account** for broader access.
@@ -43,7 +43,7 @@ Each instance of Prioritize is a standalone Apps Script web app deployment backe
 
 ### Visual theme
 
-CSS custom properties are declared in the `:root` block near the top of `Index.html`:
+CSS custom properties are declared in the `:root` block near the top of `src/Index.html`:
 
 ```css
 :root {
@@ -65,7 +65,7 @@ Edit these to change the color scheme globally. The bucket colors (`--should-col
 
 ### Default seed data
 
-On first boot, `Code.gs` seeds items and config from two constants:
+On first boot, `src/Code.gs` seeds items and config from two constants:
 
 ```js
 const DEFAULT_ITEMS = [
