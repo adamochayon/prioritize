@@ -417,7 +417,8 @@
       if (boot.isAdmin) {
         const nav = document.querySelector('nav.tabs');
         const adminLink = document.createElement('a');
-        adminLink.href = '?v=admin';
+        adminLink.href = boot.webAppUrl + '?v=admin';
+        adminLink.target = '_top';
         adminLink.className = 'tab admin-link';
         adminLink.textContent = 'Admin';
         nav.appendChild(adminLink);

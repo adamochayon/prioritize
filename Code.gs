@@ -440,6 +440,7 @@ function getBoot() {
     me: me,
     mySubmission: findSubmissionByEmail_(me.email),
     isAdmin: isAdmin_(),
+    webAppUrl: ScriptApp.getService().getUrl(),
   };
 }
 
@@ -557,6 +558,7 @@ function getAdminBoot() {
     },
     sheetUrl: getSheetUrl(),
     me: me,
+    webAppUrl: ScriptApp.getService().getUrl(),
   };
 }
 
