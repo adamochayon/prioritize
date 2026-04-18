@@ -13,9 +13,9 @@
  *   3. Share the URL.
  */
 
-// ---------- Items ---------------------------------------------------------
+// ---------- Default seeds (used only on first boot) -----------------------
 
-const ITEMS = [
+const DEFAULT_ITEMS = [
   { id: 'sso',          name: 'Single sign-on (SAML / OIDC)' },
   { id: 'mobile_app',   name: 'Native mobile apps for iOS and Android' },
   { id: 'dark_mode',    name: 'Dark mode across all product surfaces' },
@@ -26,7 +26,7 @@ const ITEMS = [
   { id: 'ai_assist',    name: 'AI-generated summaries and smart suggestions' },
 ];
 
-const BUCKETS = [
+const DEFAULT_BUCKETS = [
   { id: 'must',   label: 'Must have',   weight: 12, cap: 3 },
   { id: 'should', label: 'Should have', weight: 6,  cap: 4 },
   { id: 'could',  label: 'Could have',  weight: 2,  cap: 4 },
@@ -39,6 +39,11 @@ const DISPLAY_NAME_OVERRIDES = {
 };
 
 const HEADERS = ['timestamp', 'email', 'display_name', 'assignments_json'];
+
+const CONFIG_HEADERS = ['key', 'value'];
+const ITEMS_HEADERS  = ['id', 'name', 'description', 'order'];
+
+const DEFAULT_BLURB = 'More priorities than bandwidth — this exercise forces explicit bets. Drag each item into one of four buckets: Must have (your top 3 bets), Should have (4 items), Could have (4 items), or Won\'t have (5 things we\'re explicitly deprioritizing for now). Save anytime — resubmit to update. Results aggregate across everyone so we can see where we agree and where we don\'t.';
 
 // ---------- Web app entry ------------------------------------------------
 
@@ -53,7 +58,18 @@ function doGet(e) {
 // ---------- Config -------------------------------------------------------
 
 function getConfig_() {
-  return { items: ITEMS, buckets: BUCKETS };
+  const cfg = getConfigFromSheet_();
+  const items = getItemsFromSheet_();
+  return {
+    items: items,
+    buckets: cfg.buckets,
+    title: cfg.title,
+    subtitle: cfg.subtitle,
+    blurb: cfg.blurb,
+    mode: cfg.mode,
+    resultsVisibility: cfg.resultsVisibility,
+    anonymous: cfg.anonymous,
+  };
 }
 
 // ---------- Identity -----------------------------------------------------
@@ -66,7 +82,7 @@ function getCurrentUser_() {
       'Unable to determine your identity. Please open this URL while signed in to your Google account.'
     );
   }
-  return { email, displayName: deriveDisplayName_(email) };
+  return { email: email, displayName: deriveDisplayName_(email) };
 }
 
 function deriveDisplayName_(email) {
@@ -81,7 +97,7 @@ function deriveDisplayName_(email) {
 
 // ---------- Sheet plumbing -----------------------------------------------
 
-function getSheet_() {
+function getWorkbook_() {
   const props = PropertiesService.getScriptProperties();
   let id = props.getProperty('SHEET_ID');
   let ss;
@@ -97,6 +113,12 @@ function getSheet_() {
     ss = SpreadsheetApp.create('Prioritize — Submissions');
     props.setProperty('SHEET_ID', ss.getId());
   }
+  return ss;
+}
+
+function getSubmissionsSheet_() {
+  const ss = getWorkbook_();
+  seedDefaultsIfEmpty_(ss);
   let sheet = ss.getSheetByName('Submissions');
   if (!sheet) {
     sheet = ss.getSheets()[0];
@@ -108,6 +130,18 @@ function getSheet_() {
     sheet.appendRow(HEADERS);
   }
   return sheet;
+}
+
+function getConfigSheet_() {
+  const ss = getWorkbook_();
+  seedDefaultsIfEmpty_(ss);
+  return ss.getSheetByName('Config');
+}
+
+function getItemsSheet_() {
+  const ss = getWorkbook_();
+  seedDefaultsIfEmpty_(ss);
+  return ss.getSheetByName('Items');
 }
 
 function getSheetUrl() {
@@ -122,7 +156,7 @@ function normalizeEmail_(email) {
 }
 
 function readAllRows_() {
-  const sheet = getSheet_();
+  const sheet = getSubmissionsSheet_();
   const last = sheet.getLastRow();
   if (last < 2) return [];
   const values = sheet.getRange(2, 1, last - 1, HEADERS.length).getValues();
@@ -145,18 +179,212 @@ function safeParse_(cell) {
   }
 }
 
+// ---------- Seeder -------------------------------------------------------
+
+function seedDefaultsIfEmpty_(ss) {
+  // --- Config sheet ---
+  let configSheet = ss.getSheetByName('Config');
+  if (!configSheet) {
+    configSheet = ss.insertSheet('Config');
+    configSheet.appendRow(CONFIG_HEADERS);
+  } else {
+    const hdr = configSheet.getRange(1, 1, 1, CONFIG_HEADERS.length).getValues()[0];
+    if (hdr.join('|') !== CONFIG_HEADERS.join('|')) {
+      configSheet.clear();
+      configSheet.appendRow(CONFIG_HEADERS);
+    }
+  }
+
+  // Determine the admin email for seeding.
+  let adminEmail = '';
+  try {
+    adminEmail = Session.getEffectiveUser().getEmail();
+  } catch (e) {
+    adminEmail = '';
+  }
+  if (!adminEmail) {
+    try {
+      adminEmail = Session.getActiveUser().getEmail();
+    } catch (e) {
+      adminEmail = '';
+    }
+  }
+
+  const defaultConfigRows = [
+    ['title',              'Prioritize'],
+    ['subtitle',           'Rank the items below'],
+    ['blurb',              DEFAULT_BLURB],
+    ['mode',               'moscow'],
+    ['buckets_json',       JSON.stringify(DEFAULT_BUCKETS)],
+    ['results_visibility', 'always'],
+    ['anonymous',          'false'],
+    ['admin_emails',       adminEmail],
+  ];
+
+  // Read existing keys so we only add missing ones.
+  const lastConfigRow = configSheet.getLastRow();
+  const existingKeys = {};
+  if (lastConfigRow >= 2) {
+    const existing = configSheet.getRange(2, 1, lastConfigRow - 1, 2).getValues();
+    existing.forEach(function(row) {
+      if (row[0]) existingKeys[String(row[0])] = true;
+    });
+  }
+
+  defaultConfigRows.forEach(function(pair) {
+    if (!existingKeys[pair[0]]) {
+      configSheet.appendRow(pair);
+    }
+  });
+
+  // --- Items sheet ---
+  let itemsSheet = ss.getSheetByName('Items');
+  if (!itemsSheet) {
+    itemsSheet = ss.insertSheet('Items');
+    itemsSheet.appendRow(ITEMS_HEADERS);
+  } else {
+    const hdr = itemsSheet.getRange(1, 1, 1, ITEMS_HEADERS.length).getValues()[0];
+    if (hdr.join('|') !== ITEMS_HEADERS.join('|')) {
+      itemsSheet.clear();
+      itemsSheet.appendRow(ITEMS_HEADERS);
+    }
+  }
+
+  const lastItemRow = itemsSheet.getLastRow();
+  if (lastItemRow < 2) {
+    DEFAULT_ITEMS.forEach(function(item, index) {
+      itemsSheet.appendRow([item.id, item.name, '', index]);
+    });
+  }
+}
+
+// ---------- Sheet readers ------------------------------------------------
+
+function getConfigFromSheet_() {
+  const sheet = getConfigSheet_();
+  const last = sheet.getLastRow();
+  const defaults = {
+    title: 'Prioritize',
+    subtitle: 'Rank the items below',
+    blurb: DEFAULT_BLURB,
+    mode: 'moscow',
+    buckets: DEFAULT_BUCKETS,
+    resultsVisibility: 'always',
+    anonymous: false,
+    adminEmails: [],
+  };
+
+  if (last < 2) return defaults;
+
+  const rows = sheet.getRange(2, 1, last - 1, 2).getValues();
+  const map = {};
+  rows.forEach(function(row) {
+    if (row[0]) map[String(row[0])] = row[1];
+  });
+
+  var buckets = defaults.buckets;
+  if (map['buckets_json']) {
+    try {
+      buckets = JSON.parse(map['buckets_json']);
+    } catch (e) {
+      buckets = defaults.buckets;
+    }
+  }
+
+  var adminEmails = [];
+  if (map['admin_emails']) {
+    adminEmails = String(map['admin_emails'])
+      .split(/[\s,]+/)
+      .map(function(s) { return s.trim().toLowerCase(); })
+      .filter(function(s) { return s.length > 0; });
+  }
+
+  var anonRaw = map['anonymous'];
+  var anonymous = false;
+  if (anonRaw !== undefined && anonRaw !== null && anonRaw !== '') {
+    var anonStr = String(anonRaw).trim().toLowerCase();
+    anonymous = (anonStr === 'true' || anonStr === '1');
+  }
+
+  return {
+    title:             map['title']              !== undefined ? String(map['title'])              : defaults.title,
+    subtitle:          map['subtitle']           !== undefined ? String(map['subtitle'])           : defaults.subtitle,
+    blurb:             map['blurb']              !== undefined ? String(map['blurb'])              : defaults.blurb,
+    mode:              map['mode']               !== undefined ? String(map['mode'])               : defaults.mode,
+    buckets:           buckets,
+    resultsVisibility: map['results_visibility'] !== undefined ? String(map['results_visibility']) : defaults.resultsVisibility,
+    anonymous:         anonymous,
+    adminEmails:       adminEmails,
+  };
+}
+
+function getItemsFromSheet_() {
+  const sheet = getItemsSheet_();
+  const last = sheet.getLastRow();
+  if (last < 2) return [];
+  const rows = sheet.getRange(2, 1, last - 1, ITEMS_HEADERS.length).getValues();
+  const items = rows
+    .filter(function(row) { return row[0] && String(row[0]).trim() !== ''; })
+    .map(function(row) {
+      return {
+        id:          String(row[0]).trim(),
+        name:        String(row[1] || '').trim(),
+        description: String(row[2] || '').trim(),
+        order:       Number(row[3]) || 0,
+      };
+    });
+  items.sort(function(a, b) { return a.order - b.order; });
+  return items;
+}
+
+// ---------- Config writer ------------------------------------------------
+
+// Writes config values back to the Config sheet.
+// No admin gating in this task — another task (F2) wires that.
+function saveConfig(payload) {
+  if (!payload || typeof payload !== 'object') throw new Error('Invalid payload');
+
+  const sheet = getConfigSheet_();
+  const last = sheet.getLastRow();
+  if (last < 2) return;
+
+  const rows = sheet.getRange(2, 1, last - 1, 2).getValues();
+
+  const updates = {};
+  if (payload.title       !== undefined) updates['title']              = String(payload.title);
+  if (payload.subtitle    !== undefined) updates['subtitle']           = String(payload.subtitle);
+  if (payload.blurb       !== undefined) updates['blurb']             = String(payload.blurb);
+  if (payload.mode        !== undefined) updates['mode']               = String(payload.mode);
+  if (payload.buckets     !== undefined) updates['buckets_json']       = JSON.stringify(payload.buckets);
+  if (payload.resultsVisibility !== undefined) updates['results_visibility'] = String(payload.resultsVisibility);
+  if (payload.anonymous   !== undefined) updates['anonymous']          = String(!!payload.anonymous);
+  if (payload.adminEmails !== undefined) updates['admin_emails']       = Array.isArray(payload.adminEmails) ? payload.adminEmails.join('\n') : String(payload.adminEmails);
+
+  rows.forEach(function(row, i) {
+    const key = String(row[0]);
+    if (updates[key] !== undefined) {
+      sheet.getRange(i + 2, 2).setValue(updates[key]);
+    }
+  });
+}
+
 // ---------- Validation ---------------------------------------------------
 
+// Reads runtime items/buckets from getConfig_() to avoid hardcoded references.
 function validateAssignments_(assignments) {
   if (!assignments || typeof assignments !== 'object' || Array.isArray(assignments)) {
     throw new Error('assignments must be an object');
   }
-  const validItemIds = new Set(ITEMS.map(i => i.id));
-  const validBucketIds = new Set(BUCKETS.map(b => b.id));
+  const cfg = getConfig_();
+  const items   = cfg.items;
+  const buckets = cfg.buckets;
+
+  const validItemIds   = new Set(items.map(function(i) { return i.id; }));
+  const validBucketIds = new Set(buckets.map(function(b) { return b.id; }));
   const gotKeys = Object.keys(assignments);
 
-  if (gotKeys.length !== ITEMS.length) {
-    throw new Error(`Expected ${ITEMS.length} items, got ${gotKeys.length}`);
+  if (gotKeys.length !== items.length) {
+    throw new Error(`Expected ${items.length} items, got ${gotKeys.length}`);
   }
   for (const key of gotKeys) {
     if (!validItemIds.has(key)) throw new Error(`Unknown item id: ${key}`);
@@ -164,10 +392,10 @@ function validateAssignments_(assignments) {
   }
 
   const counts = {};
-  BUCKETS.forEach(b => { counts[b.id] = 0; });
+  buckets.forEach(function(b) { counts[b.id] = 0; });
   for (const bucketId of Object.values(assignments)) counts[bucketId]++;
 
-  for (const bucket of BUCKETS) {
+  for (const bucket of buckets) {
     if (counts[bucket.id] !== bucket.cap) {
       throw new Error(`${bucket.label} must contain exactly ${bucket.cap} items (has ${counts[bucket.id]})`);
     }
@@ -184,8 +412,9 @@ function getBoot() {
   const me = getCurrentUser_();
   return {
     config: getConfig_(),
-    me,
+    me: me,
     mySubmission: findSubmissionByEmail_(me.email),
+    isAdmin: false,
   };
 }
 
@@ -211,7 +440,7 @@ function saveSubmission(payload) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const sheet = getSheet_();
+    const sheet = getSubmissionsSheet_();
     const rows = readAllRows_();
     const existing = rows.find((r) => normalizeEmail_(r.email) === me.email);
 
@@ -248,12 +477,17 @@ function getResults() {
   };
 }
 
+// Reads runtime items/buckets from getConfig_() to avoid hardcoded references.
 function aggregate_(rows) {
+  const cfg = getConfig_();
+  const items   = cfg.items;
+  const buckets = cfg.buckets;
+
   const bucketWeightMap = {};
-  BUCKETS.forEach(b => { bucketWeightMap[b.id] = b.weight; });
+  buckets.forEach(function(b) { bucketWeightMap[b.id] = b.weight; });
 
   const itemMap = {};
-  ITEMS.forEach((item) => {
+  items.forEach(function(item) {
     itemMap[item.id] = {
       id: item.id,
       name: item.name,
@@ -267,7 +501,7 @@ function aggregate_(rows) {
   rows.forEach((row) => {
     const a = row.assignments;
     if (!a || typeof a !== 'object') return;
-    ITEMS.forEach((item) => {
+    items.forEach(function(item) {
       const bucketId = a[item.id];
       if (!bucketId || bucketWeightMap[bucketId] === undefined) return;
       const entry = itemMap[item.id];
