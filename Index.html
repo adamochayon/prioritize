@@ -629,6 +629,15 @@
     function renderResults(data) {
       const el = document.getElementById('results-content');
       el.className = '';
+      if (data.gated) {
+        const msgs = {
+          'admin_only':   'Results are visible only to admins for this ranking.',
+          'submit_first': 'Submit your ranking first to see the aggregated results.',
+        };
+        const msg = msgs[data.gated] || 'Results are not available right now.';
+        el.innerHTML = `<div class="notice">${escapeHtml(msg)}</div>`;
+        return;
+      }
       if (!data.submissions || data.submissions.length === 0) {
         el.innerHTML = `<div class="notice">No submissions yet. Be the first — switch to <b>Rank</b>.</div>`;
         return;

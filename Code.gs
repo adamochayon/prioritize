@@ -490,9 +490,24 @@ function saveSubmission(payload) {
 }
 
 function getResults() {
-  const rows = readAllRows_();
   const cfg = getConfigFromSheet_();
   const admin = isAdmin_();
+
+  if (!admin) {
+    const rv = cfg.resultsVisibility;
+    if (rv === 'admin_only') {
+      return { gated: 'admin_only', items: [], submissions: [] };
+    }
+    if (rv === 'after_submit') {
+      const me = getCurrentUser_();
+      const sub = findSubmissionByEmail_(me.email);
+      if (!sub) {
+        return { gated: 'submit_first', items: [], submissions: [] };
+      }
+    }
+  }
+
+  const rows = readAllRows_();
   const shouldAnonymize = cfg.anonymous && !admin;
 
   let items = aggregate_(rows);
@@ -513,6 +528,35 @@ function getResults() {
   return {
     items: items,
     submissions: submissions,
+  };
+}
+
+function getAdminBoot() {
+  if (!isAdmin_()) {
+    throw new Error('Not authorized — admin access required.');
+  }
+  const cfg = getConfigFromSheet_();
+  const items = getItemsFromSheet_();
+  const rows = readAllRows_();
+  const me = getCurrentUser_();
+  return {
+    config: {
+      title:             cfg.title,
+      subtitle:          cfg.subtitle,
+      blurb:             cfg.blurb,
+      mode:              cfg.mode,
+      buckets:           cfg.buckets,
+      resultsVisibility: cfg.resultsVisibility,
+      anonymous:         cfg.anonymous,
+      adminEmails:       cfg.adminEmails,
+      items:             items,
+    },
+    stats: {
+      submissionCount: rows.length,
+      itemCount:       items.length,
+    },
+    sheetUrl: getSheetUrl(),
+    me: me,
   };
 }
 
