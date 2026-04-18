@@ -1,0 +1,15 @@
+# clasp configuration
+.clasp.json
+
+# dependencies
+node_modules/
+
+# OS
+.DS_Store
+
+# logs
+*.log
+
+# environment
+.env
+.env.local
