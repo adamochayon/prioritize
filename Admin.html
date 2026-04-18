@@ -517,8 +517,7 @@
         var n = parseInt(document.getElementById('cfg-topn').value, 10);
         if (!(n > 0)) n = 5;
         buckets = [
-          { id: 'top',  label: 'Top ' + n, weight: 1, cap: n },
-          { id: 'rest', label: 'Rest',      weight: 0, cap: null },
+          { id: 'top', label: 'Top ' + n, weight: 1, cap: n },
         ];
       } else {
         var mustCap   = parseInt(document.getElementById('cap-must').value,   10) || 3;
@@ -594,7 +593,7 @@
         .getResults();
     }
 
-    var BUCKET_LETTER = { must: 'M', should: 'S', could: 'C', wont: 'W', top: 'T', rest: 'R' };
+    var BUCKET_LETTER = { must: 'M', should: 'S', could: 'C', wont: 'W', top: 'T' };
 
     function renderResults(data) {
       var el = document.getElementById('results-content');

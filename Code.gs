@@ -401,18 +401,32 @@ function validateAssignments_(assignments) {
   const cfg = getConfig_();
   const items   = cfg.items;
   const buckets = cfg.buckets;
+  const mode    = cfg.mode;
 
   const validItemIds   = new Set(items.map(function(i) { return i.id; }));
   const validBucketIds = new Set(buckets.map(function(b) { return b.id; }));
   const gotKeys = Object.keys(assignments);
 
-  const hasUnlimitedCap = buckets.some(function(b) { return b.cap == null || b.cap === 0; });
-  if (!hasUnlimitedCap && gotKeys.length !== items.length) {
-    throw new Error(`Expected ${items.length} items, got ${gotKeys.length}`);
-  }
   for (const key of gotKeys) {
     if (!validItemIds.has(key)) throw new Error(`Unknown item id: ${key}`);
     if (!validBucketIds.has(assignments[key])) throw new Error(`Unknown bucket id: ${assignments[key]}`);
+  }
+
+  if (mode === 'topn') {
+    // Top-N: only the 'top' bucket is used; unassigned items are the implicit rest.
+    const topBucket = buckets.find(function(b) { return b.id === 'top'; });
+    if (!topBucket) throw new Error('Top-N config is missing a "top" bucket');
+    const topCount = gotKeys.filter(function(k) { return assignments[k] === 'top'; }).length;
+    if (topCount !== topBucket.cap) {
+      throw new Error(`Top must contain exactly ${topBucket.cap} items (has ${topCount})`);
+    }
+    return;
+  }
+
+  // MoSCoW (and any future multi-bucket modes): all items must be assigned.
+  const hasUnlimitedCap = buckets.some(function(b) { return b.cap == null || b.cap === 0; });
+  if (!hasUnlimitedCap && gotKeys.length !== items.length) {
+    throw new Error(`Expected ${items.length} items, got ${gotKeys.length}`);
   }
 
   const counts = {};

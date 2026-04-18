@@ -448,9 +448,17 @@
         const btn = e.target.closest('.bsel');
         if (!btn) return;
         const li = btn.closest('.item');
+        if (!li) return;
         const targetBucketId = btn.dataset.bucket;
+        if (targetBucketId === 'bank') {
+          // "Skip" button — move item back to the bank.
+          document.getElementById('bank-list').appendChild(li);
+          li.querySelectorAll('.bsel').forEach(b => b.classList.remove('active'));
+          syncUI();
+          return;
+        }
         const targetList = document.querySelector(`.bucket[data-bucket-id="${targetBucketId}"] .item-list`);
-        if (!targetList || !li) return;
+        if (!targetList) return;
         targetList.appendChild(li);
         updateItemSelector(li, targetBucketId);
         syncUI();
@@ -481,7 +489,11 @@
 
     function renderBucketColumns() {
       const col = document.getElementById('buckets-col');
-      col.innerHTML = state.config.buckets.map(b => `
+      // In Top-N mode, only render the single 'top' bucket; the rest stay in the bank.
+      const bucketsToRender = state.config.mode === 'topn'
+        ? state.config.buckets.filter(b => b.id === 'top')
+        : state.config.buckets;
+      col.innerHTML = bucketsToRender.map(b => `
         <div class="bucket" data-bucket-id="${b.id}">
           <div class="bucket-header">
             <span>${escapeHtml(b.label)}</span>
@@ -498,19 +510,33 @@
       const assignments = mySubmission && mySubmission.assignments;
 
       if (assignments) {
-        state.config.buckets.forEach(b => {
-          const ul = document.getElementById(`bucket-list-${b.id}`);
+        if (state.config.mode === 'topn') {
+          // Only items assigned to 'top' go into the top bucket; rest stay in bank.
+          const topList = document.getElementById('bucket-list-top');
           state.config.items.forEach(item => {
-            if (assignments[item.id] === b.id) {
+            if (assignments[item.id] === 'top' && topList) {
               const li = makeItemEl(item);
-              ul.appendChild(li);
-              updateItemSelector(li, b.id);
+              topList.appendChild(li);
+              updateItemSelector(li, 'top');
+            } else {
+              bankList.appendChild(makeItemEl(item));
             }
           });
-        });
-        state.config.items.forEach(item => {
-          if (!assignments[item.id]) bankList.appendChild(makeItemEl(item));
-        });
+        } else {
+          state.config.buckets.forEach(b => {
+            const ul = document.getElementById(`bucket-list-${b.id}`);
+            state.config.items.forEach(item => {
+              if (assignments[item.id] === b.id) {
+                const li = makeItemEl(item);
+                ul.appendChild(li);
+                updateItemSelector(li, b.id);
+              }
+            });
+          });
+          state.config.items.forEach(item => {
+            if (!assignments[item.id]) bankList.appendChild(makeItemEl(item));
+          });
+        }
       } else {
         state.config.items.forEach(item => bankList.appendChild(makeItemEl(item)));
       }
@@ -520,14 +546,24 @@
       const li = document.createElement('li');
       li.className = 'item';
       li.dataset.id = item.id;
-      const selectorHtml = state.config.mode === 'moscow' ? `
-        <span class="bucket-selector">
-          <button class="bsel" data-bucket="must"   title="Must have">⇑ M</button>
-          <button class="bsel" data-bucket="should" title="Should have">↑ S</button>
-          <button class="bsel" data-bucket="could"  title="Could have">~ C</button>
-          <button class="bsel" data-bucket="wont"   title="Won't have">↓ W</button>
-        </span>
-      ` : '';
+      let selectorHtml = '';
+      if (state.config.mode === 'moscow') {
+        selectorHtml = `
+          <span class="bucket-selector">
+            <button class="bsel" data-bucket="must"   title="Must have">⇑ M</button>
+            <button class="bsel" data-bucket="should" title="Should have">↑ S</button>
+            <button class="bsel" data-bucket="could"  title="Could have">~ C</button>
+            <button class="bsel" data-bucket="wont"   title="Won't have">↓ W</button>
+          </span>
+        `;
+      } else if (state.config.mode === 'topn') {
+        selectorHtml = `
+          <span class="bucket-selector">
+            <button class="bsel" data-bucket="top"  title="Add to Top">⇑ Top</button>
+            <button class="bsel" data-bucket="bank" title="Skip (leave unranked)">↓ Skip</button>
+          </span>
+        `;
+      }
       li.innerHTML = `
         <span class="item-name">${escapeHtml(item.name)}</span>
         ${selectorHtml}
@@ -552,7 +588,8 @@
       };
       new Sortable(document.getElementById('bank-list'), opts);
       state.config.buckets.forEach(b => {
-        new Sortable(document.getElementById(`bucket-list-${b.id}`), opts);
+        const el = document.getElementById(`bucket-list-${b.id}`);
+        if (el) new Sortable(el, opts);
       });
     }
 
@@ -567,11 +604,18 @@
     function readAssignments() {
       const assignments = {};
       let unassigned = 0;
-      state.config.buckets.forEach(b => {
-        document.querySelectorAll(`.bucket[data-bucket-id="${b.id}"] .item`).forEach(li => {
-          assignments[li.dataset.id] = b.id;
+      if (state.config.mode === 'topn') {
+        // Only the 'top' bucket is tracked; bank items are implicitly unranked.
+        document.querySelectorAll(`.bucket[data-bucket-id="top"] .item`).forEach(li => {
+          assignments[li.dataset.id] = 'top';
         });
-      });
+      } else {
+        state.config.buckets.forEach(b => {
+          document.querySelectorAll(`.bucket[data-bucket-id="${b.id}"] .item`).forEach(li => {
+            assignments[li.dataset.id] = b.id;
+          });
+        });
+      }
       document.querySelectorAll('#bank-list .item').forEach(() => { unassigned++; });
       return { assignments, unassigned };
     }
@@ -583,18 +627,36 @@
       state.config.buckets.forEach(b => { counts[b.id] = 0; });
       Object.values(assignments).forEach(bid => { counts[bid] = (counts[bid] || 0) + 1; });
 
-      state.config.buckets.forEach(b => {
-        const n = counts[b.id];
-        const isValid = n === b.cap;
-        const el = document.getElementById(`counter-${b.id}`);
-        el.textContent = isValid ? `(${n}/${b.cap} \u2713)` : `(${n}/${b.cap})`;
-        el.className = `bucket-counter mono ${isValid ? 'valid' : 'invalid'}`;
-      });
+      let allValid;
+      if (state.config.mode === 'topn') {
+        // Top-N: only the 'top' bucket counter is rendered; bank items are fine unassigned.
+        const topBucket = state.config.buckets.find(b => b.id === 'top');
+        if (topBucket) {
+          const n = counts['top'] || 0;
+          const isValid = n === topBucket.cap;
+          const el = document.getElementById(`counter-top`);
+          if (el) {
+            el.textContent = isValid ? `(${n}/${topBucket.cap} \u2713)` : `(${n}/${topBucket.cap})`;
+            el.className = `bucket-counter mono ${isValid ? 'valid' : 'invalid'}`;
+          }
+          allValid = isValid;
+        } else {
+          allValid = false;
+        }
+      } else {
+        state.config.buckets.forEach(b => {
+          const n = counts[b.id];
+          const isValid = n === b.cap;
+          const el = document.getElementById(`counter-${b.id}`);
+          el.textContent = isValid ? `(${n}/${b.cap} \u2713)` : `(${n}/${b.cap})`;
+          el.className = `bucket-counter mono ${isValid ? 'valid' : 'invalid'}`;
+        });
+        allValid = unassigned === 0 && state.config.buckets.every(b => counts[b.id] === b.cap);
+      }
 
       const bankCounter = document.getElementById('bank-counter');
       bankCounter.textContent = `(${unassigned} remaining)`;
 
-      const allValid = unassigned === 0 && state.config.buckets.every(b => counts[b.id] === b.cap);
       const btn = document.getElementById('submit-btn');
       btn.disabled = !allValid || state.submitting;
       btn.textContent = state.submitting ? 'Saving\u2026' : (state.hasPriorSubmission ? 'Update ranking' : 'Save ranking');
