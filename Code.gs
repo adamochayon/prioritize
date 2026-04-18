@@ -406,7 +406,8 @@ function validateAssignments_(assignments) {
   const validBucketIds = new Set(buckets.map(function(b) { return b.id; }));
   const gotKeys = Object.keys(assignments);
 
-  if (gotKeys.length !== items.length) {
+  const hasUnlimitedCap = buckets.some(function(b) { return b.cap == null || b.cap === 0; });
+  if (!hasUnlimitedCap && gotKeys.length !== items.length) {
     throw new Error(`Expected ${items.length} items, got ${gotKeys.length}`);
   }
   for (const key of gotKeys) {
@@ -419,7 +420,8 @@ function validateAssignments_(assignments) {
   for (const bucketId of Object.values(assignments)) counts[bucketId]++;
 
   for (const bucket of buckets) {
-    if (counts[bucket.id] !== bucket.cap) {
+    const isUnlimited = bucket.cap == null || bucket.cap === 0;
+    if (!isUnlimited && counts[bucket.id] !== bucket.cap) {
       throw new Error(`${bucket.label} must contain exactly ${bucket.cap} items (has ${counts[bucket.id]})`);
     }
   }
@@ -489,14 +491,28 @@ function saveSubmission(payload) {
 
 function getResults() {
   const rows = readAllRows_();
+  const cfg = getConfigFromSheet_();
+  const admin = isAdmin_();
+  const shouldAnonymize = cfg.anonymous && !admin;
+
+  let items = aggregate_(rows);
+  if (shouldAnonymize) {
+    items = items.map((item) => ({
+      ...item,
+      voters: item.voters.map((v) => ({ voter: 'Anonymous', bucket: v.bucket })),
+    }));
+  }
+
+  const submissions = shouldAnonymize ? [] : rows.map((r) => ({
+    email: r.email,
+    displayName: r.displayName,
+    submittedAt: r.timestamp instanceof Date ? r.timestamp.toISOString() : r.timestamp,
+    assignments: r.assignments,
+  }));
+
   return {
-    items: aggregate_(rows),
-    submissions: rows.map((r) => ({
-      email: r.email,
-      displayName: r.displayName,
-      submittedAt: r.timestamp instanceof Date ? r.timestamp.toISOString() : r.timestamp,
-      assignments: r.assignments,
-    })),
+    items: items,
+    submissions: submissions,
   };
 }
 
