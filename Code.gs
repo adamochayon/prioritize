@@ -56,6 +56,13 @@ const DEFAULT_CONFIG = {
   adminEmails:       [],  // resolved at install time to the script owner's email
 };
 
+// ---------- Invocation-scoped caches -------------------------------------
+// Apps Script creates a fresh script instance per invocation, so these
+// module-level vars act as request-scoped caches — no cross-invocation leakage.
+
+var _isAdminCache = null;  // null = uncached; true/false = cached result
+var _rowsCache    = null;  // null = uncached; array = cached readAllRows_ result
+
 // ---------- Installer ----------------------------------------------------
 
 function ensureInstalled_() {
@@ -171,13 +178,16 @@ function ensureInstalled_() {
 // ---------- Web app entry ------------------------------------------------
 
 function isAdmin_() {
+  if (_isAdminCache !== null) return _isAdminCache;
   try {
     const me = normalizeEmail_(Session.getActiveUser().getEmail());
-    if (!me) return false;
+    if (!me) { _isAdminCache = false; return false; }
     const cfg = getConfigFromSheet_();
     const admins = (cfg.adminEmails || []).map(function(e) { return String(e).trim().toLowerCase(); });
-    return admins.indexOf(me) !== -1;
+    _isAdminCache = admins.indexOf(me) !== -1;
+    return _isAdminCache;
   } catch (e) {
+    _isAdminCache = false;
     return false;
   }
 }
@@ -285,17 +295,22 @@ function normalizeEmail_(email) {
 }
 
 function readAllRows_() {
+  if (_rowsCache !== null) return _rowsCache;
   const sheet = getSubmissionsSheet_();
   const last = sheet.getLastRow();
-  if (last < 2) return [];
+  if (last < 2) {
+    _rowsCache = [];
+    return _rowsCache;
+  }
   const values = sheet.getRange(2, 1, last - 1, HEADERS.length).getValues();
-  return values.map((row, i) => ({
+  _rowsCache = values.map((row, i) => ({
     rowIndex: i + 2,
     timestamp: row[0],
     email: row[1],
     displayName: row[2],
     assignments: safeParse_(row[3]),
   }));
+  return _rowsCache;
 }
 
 function safeParse_(cell) {
@@ -449,6 +464,7 @@ function saveConfig(payload) {
       if (lastSub >= 2) {
         subSheet.deleteRows(2, lastSub - 1);
       }
+      _rowsCache = null;
     }
 
     const sheet = getConfigSheet_();
@@ -607,6 +623,7 @@ function saveSubmission(payload) {
     } else {
       sheet.appendRow(record);
     }
+    _rowsCache = null;
     return {
       ok: true,
       email: me.email,
@@ -632,6 +649,7 @@ function deleteAllSubmissions() {
     if (lastRow >= 2) {
       sheet.deleteRows(2, lastRow - 1);
     }
+    _rowsCache = null;
     return { ok: true };
   } finally {
     lock.releaseLock();
@@ -649,6 +667,7 @@ function deleteMySubmission() {
     const mine = rows.find((r) => normalizeEmail_(r.email) === me.email);
     if (!mine) return { ok: true, deleted: false };
     sheet.deleteRow(mine.rowIndex);
+    _rowsCache = null;
     return { ok: true, deleted: true };
   } finally {
     lock.releaseLock();
