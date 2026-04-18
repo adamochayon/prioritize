@@ -12,12 +12,12 @@ MoSCoW is a standard prioritization framework where every item must be placed in
 
 | Bucket id | Label | Cap | Weight |
 |-----------|-------|-----|--------|
-| `must` | Must have | 3 | 12 |
-| `should` | Should have | 4 | 6 |
-| `could` | Could have | 4 | 2 |
-| `wont` | Won't have | 5 | 0 |
+| `must` | Must have | 2 | 12 |
+| `should` | Should have | 2 | 6 |
+| `could` | Could have | 2 | 2 |
+| `wont` | Won't have | 2 | 0 |
 
-Total items per submission: 16 (3 + 4 + 4 + 5).
+Total items per submission: 8 (2 per bucket). Adjust caps via `buckets_json` if your backlog needs a different shape.
 
 ### Weights
 
@@ -58,7 +58,7 @@ The cap on `top` determines N. The `rest` bucket has no cap (`null`), so remaini
 ### When to use Top-N
 
 - Straw polls: "which 3 of these 12 topics should we cover next quarter?"
-- Large item lists where MoSCoW's 16-item total is too restrictive.
+- Large item lists where MoSCoW's default 8-item total is too restrictive.
 - Situations where the nuance of Must/Should/Could is not needed and you just want vote counts.
 
 ---

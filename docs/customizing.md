@@ -74,10 +74,10 @@ const DEFAULT_ITEMS = [
 ];
 
 const DEFAULT_BUCKETS = [
-  { id: 'must',   label: 'Must have',   weight: 12, cap: 3 },
-  { id: 'should', label: 'Should have', weight: 6,  cap: 4 },
-  { id: 'could',  label: 'Could have',  weight: 2,  cap: 4 },
-  { id: 'wont',   label: "Won't have",  weight: 0,  cap: 5 },
+  { id: 'must',   label: 'Must have',   weight: 12, cap: 2 },
+  { id: 'should', label: 'Should have', weight: 6,  cap: 2 },
+  { id: 'could',  label: 'Could have',  weight: 2,  cap: 2 },
+  { id: 'wont',   label: "Won't have",  weight: 0,  cap: 2 },
 ];
 ```
 
@@ -87,9 +87,9 @@ For bucket changes, see [modes.md](./modes.md) for the constraints around bucket
 
 ### Adding a new Config key
 
-1. **Add a default** in `getConfigFromSheet_()` — add an entry to the `defaults` object.
-2. **Read it from the sheet** — add a `map['your_key']` read in the return statement of `getConfigFromSheet_()`, with a fallback to the default.
-3. **Seed it** — add a `['your_key', defaultValue]` pair to `defaultConfigRows` in `seedDefaultsIfEmpty_()`.
+1. **Add a default** in the `DEFAULT_CONFIG` object near the top of `src/Code.gs`.
+2. **Read it from the sheet** — in `getConfig_()`, add a `map['your_key']` read with a fallback to the `DEFAULT_CONFIG` value.
+3. **Seed it** — add a `['your_key', DEFAULT_CONFIG.yourKey]` pair to `defaultConfigRows` in `seedConfigRowsIfMissing_()`.
 4. **Write it back** — add a branch in `saveConfig()` that maps the incoming payload field to the sheet key:
    ```js
    if (payload.yourKey !== undefined) updates['your_key'] = String(payload.yourKey);

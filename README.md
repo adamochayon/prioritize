@@ -47,7 +47,7 @@ Google Forms can collect votes but can't do drag-to-bucket ranking. Survey tools
 
 ## First-run experience
 
-The first time you open the URL, the script creates a Google Sheet called "Prioritize — Submissions" in your Drive root. It pre-seeds 3 sheets: **Submissions** (vote records), **Config** (title, blurb, mode, bucket caps), and **Items** (the list to rank). 8 example items are loaded automatically. The account that ran the deploy is set as the admin.
+The first time you open the URL, the script creates a Google Sheet named after your Apps Script project — e.g. `Prioritize — <your project title>`, or just `<your project title>` if it already contains "prioritize" — in your Drive root. It pre-seeds 3 sheets: **Submissions** (vote records), **Config** (title, blurb, mode, bucket caps), and **Items** (the list to rank). 8 example items are loaded automatically. The account that ran the deploy is set as the admin.
 
 ## Configuring the tool
 
@@ -71,7 +71,7 @@ Manual users: Deploy → Manage deployments → pencil → Version: New version 
 
 Option A: In the Apps Script editor, go to **Run → Run function → `getSheetUrl`** and check the execution log.
 
-Option B: Search your Google Drive for "Prioritize — Submissions".
+Option B: Search your Google Drive for `Prioritize` (filter to type: Spreadsheet).
 
 ## License
 
