@@ -45,6 +45,17 @@ const ITEMS_HEADERS  = ['id', 'name', 'description', 'order'];
 
 const DEFAULT_BLURB = 'Rank these items into buckets to see where the group agrees and where it splits. Save anytime — resubmit to update.';
 
+const DEFAULT_CONFIG = {
+  title:             'Prioritize',
+  subtitle:          '',
+  blurb:             DEFAULT_BLURB,
+  mode:              'moscow',
+  buckets:           DEFAULT_BUCKETS,
+  resultsVisibility: 'always',
+  anonymous:         false,
+  adminEmails:       [],  // resolved at install time to the script owner's email
+};
+
 // ---------- Installer ----------------------------------------------------
 
 function ensureInstalled_() {
@@ -81,13 +92,13 @@ function ensureInstalled_() {
   }
 
   const defaultConfigRows = [
-    ['title',              'Prioritize'],
-    ['subtitle',           ''],
-    ['blurb',              DEFAULT_BLURB],
-    ['mode',               'moscow'],
-    ['buckets_json',       JSON.stringify(DEFAULT_BUCKETS)],
-    ['results_visibility', 'always'],
-    ['anonymous',          'false'],
+    ['title',              DEFAULT_CONFIG.title],
+    ['subtitle',           DEFAULT_CONFIG.subtitle],
+    ['blurb',              DEFAULT_CONFIG.blurb],
+    ['mode',               DEFAULT_CONFIG.mode],
+    ['buckets_json',       JSON.stringify(DEFAULT_CONFIG.buckets)],
+    ['results_visibility', DEFAULT_CONFIG.resultsVisibility],
+    ['anonymous',          String(DEFAULT_CONFIG.anonymous)],
     ['admin_emails',       adminEmail],
   ];
 
@@ -302,16 +313,7 @@ function safeParse_(cell) {
 function getConfigFromSheet_() {
   const sheet = getConfigSheet_();
   const last = sheet.getLastRow();
-  const defaults = {
-    title: 'Prioritize',
-    subtitle: '',
-    blurb: DEFAULT_BLURB,
-    mode: 'moscow',
-    buckets: DEFAULT_BUCKETS,
-    resultsVisibility: 'always',
-    anonymous: false,
-    adminEmails: [],
-  };
+  const defaults = DEFAULT_CONFIG;
 
   if (last < 2) return defaults;
 
