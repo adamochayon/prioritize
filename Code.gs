@@ -569,13 +569,16 @@ function aggregate_(rows) {
   const bucketWeightMap = {};
   buckets.forEach(function(b) { bucketWeightMap[b.id] = b.weight; });
 
+  const bucketCountsTemplate = {};
+  buckets.forEach(function(b) { bucketCountsTemplate[b.id] = 0; });
+
   const itemMap = {};
   items.forEach(function(item) {
     itemMap[item.id] = {
       id: item.id,
       name: item.name,
       score: 0,
-      bucketCounts: { must: 0, should: 0, could: 0, wont: 0 },
+      bucketCounts: Object.assign({}, bucketCountsTemplate),
       voters: [],
       weights: [],
     };

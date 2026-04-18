@@ -503,14 +503,17 @@
       const li = document.createElement('li');
       li.className = 'item';
       li.dataset.id = item.id;
-      li.innerHTML = `
-        <span class="item-name">${escapeHtml(item.name)}</span>
+      const selectorHtml = state.config.mode === 'moscow' ? `
         <span class="bucket-selector">
           <button class="bsel" data-bucket="must"   title="Must have">⇑ M</button>
           <button class="bsel" data-bucket="should" title="Should have">↑ S</button>
           <button class="bsel" data-bucket="could"  title="Could have">~ C</button>
           <button class="bsel" data-bucket="wont"   title="Won't have">↓ W</button>
         </span>
+      ` : '';
+      li.innerHTML = `
+        <span class="item-name">${escapeHtml(item.name)}</span>
+        ${selectorHtml}
       `;
       return li;
     }
