@@ -45,6 +45,118 @@ const ITEMS_HEADERS  = ['id', 'name', 'description', 'order'];
 
 const DEFAULT_BLURB = 'Rank these items into buckets to see where the group agrees and where it splits. Save anytime — resubmit to update.';
 
+// ---------- Installer ----------------------------------------------------
+
+function ensureInstalled_() {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('INSTALLED_AT')) return;
+
+  const ss = getWorkbook_();
+
+  // --- Config sheet ---
+  let configSheet = ss.getSheetByName('Config');
+  if (!configSheet) {
+    configSheet = ss.insertSheet('Config');
+    configSheet.appendRow(CONFIG_HEADERS);
+  } else {
+    const hdr = configSheet.getRange(1, 1, 1, CONFIG_HEADERS.length).getValues()[0];
+    if (hdr.join('|') !== CONFIG_HEADERS.join('|')) {
+      configSheet.clear();
+      configSheet.appendRow(CONFIG_HEADERS);
+    }
+  }
+
+  let adminEmail = '';
+  try {
+    adminEmail = Session.getEffectiveUser().getEmail();
+  } catch (e) {
+    adminEmail = '';
+  }
+  if (!adminEmail) {
+    try {
+      adminEmail = Session.getActiveUser().getEmail();
+    } catch (e) {
+      adminEmail = '';
+    }
+  }
+
+  const defaultConfigRows = [
+    ['title',              'Prioritize'],
+    ['subtitle',           ''],
+    ['blurb',              DEFAULT_BLURB],
+    ['mode',               'moscow'],
+    ['buckets_json',       JSON.stringify(DEFAULT_BUCKETS)],
+    ['results_visibility', 'always'],
+    ['anonymous',          'false'],
+    ['admin_emails',       adminEmail],
+  ];
+
+  const lastConfigRow = configSheet.getLastRow();
+  const existingKeys = {};
+  if (lastConfigRow >= 2) {
+    const existing = configSheet.getRange(2, 1, lastConfigRow - 1, 2).getValues();
+    existing.forEach(function(row) {
+      if (row[0]) existingKeys[String(row[0])] = true;
+    });
+  }
+
+  defaultConfigRows.forEach(function(pair) {
+    if (!existingKeys[pair[0]]) {
+      configSheet.appendRow(pair);
+    }
+  });
+
+  // --- Items sheet ---
+  let itemsSheet = ss.getSheetByName('Items');
+  if (!itemsSheet) {
+    itemsSheet = ss.insertSheet('Items');
+    itemsSheet.appendRow(ITEMS_HEADERS);
+  } else {
+    const hdr = itemsSheet.getRange(1, 1, 1, ITEMS_HEADERS.length).getValues()[0];
+    if (hdr.join('|') !== ITEMS_HEADERS.join('|')) {
+      itemsSheet.clear();
+      itemsSheet.appendRow(ITEMS_HEADERS);
+    }
+  }
+
+  const lastItemRow = itemsSheet.getLastRow();
+  const freshItems = lastItemRow < 2;
+  if (freshItems) {
+    DEFAULT_ITEMS.forEach(function(item, index) {
+      itemsSheet.appendRow([item.id, item.name, '', index]);
+    });
+  }
+
+  // --- Submissions sheet ---
+  let subSheet = ss.getSheetByName('Submissions');
+  if (!subSheet) {
+    // Legacy: if the first sheet was never renamed, rename it.
+    subSheet = ss.getSheets()[0];
+    subSheet.setName('Submissions');
+    const firstRow = subSheet.getRange(1, 1, 1, HEADERS.length).getValues()[0];
+    if (firstRow.join('|') !== HEADERS.join('|')) {
+      subSheet.clear();
+      subSheet.appendRow(HEADERS);
+    }
+  }
+
+  // Seed example submissions only on a fully fresh install.
+  if (freshItems && subSheet.getLastRow() < 2) {
+    const now = new Date();
+    const exampleSubmissions = [
+      ['alice@example.com',  'Alice',  { sso: 'must', mobile_app: 'must', dark_mode: 'should', api_v2: 'should', audit_log: 'could', bulk_import: 'could', chat_ops: 'wont', ai_assist: 'wont' }],
+      ['bob@example.com',    'Bob',    { sso: 'must', api_v2: 'must', audit_log: 'should', chat_ops: 'should', mobile_app: 'could', bulk_import: 'could', dark_mode: 'wont', ai_assist: 'wont' }],
+      ['carol@example.com',  'Carol',  { api_v2: 'must', audit_log: 'must', sso: 'should', ai_assist: 'should', chat_ops: 'could', bulk_import: 'could', mobile_app: 'wont', dark_mode: 'wont' }],
+      ['dave@example.com',   'Dave',   { sso: 'must', chat_ops: 'must', api_v2: 'should', ai_assist: 'should', audit_log: 'could', mobile_app: 'could', bulk_import: 'wont', dark_mode: 'wont' }],
+    ];
+    exampleSubmissions.forEach(function(row) {
+      subSheet.appendRow([now, row[0], row[1], JSON.stringify(row[2])]);
+    });
+  }
+
+  props.setProperty('INSTALLED_AT', new Date().toISOString());
+}
+
 // ---------- Web app entry ------------------------------------------------
 
 function isAdmin_() {
@@ -60,6 +172,7 @@ function isAdmin_() {
 }
 
 function doGet(e) {
+  ensureInstalled_();
   const v = e && e.parameter && e.parameter.v;
   if (v === 'admin') {
     const template = isAdmin_() ? 'Admin' : 'NotAuthorized';
@@ -138,31 +251,15 @@ function getWorkbook_() {
 }
 
 function getSubmissionsSheet_() {
-  const ss = getWorkbook_();
-  seedDefaultsIfEmpty_(ss);
-  let sheet = ss.getSheetByName('Submissions');
-  if (!sheet) {
-    sheet = ss.getSheets()[0];
-    sheet.setName('Submissions');
-  }
-  const firstRow = sheet.getRange(1, 1, 1, HEADERS.length).getValues()[0];
-  if (firstRow.join('|') !== HEADERS.join('|')) {
-    sheet.clear();
-    sheet.appendRow(HEADERS);
-  }
-  return sheet;
+  return getWorkbook_().getSheetByName('Submissions');
 }
 
 function getConfigSheet_() {
-  const ss = getWorkbook_();
-  seedDefaultsIfEmpty_(ss);
-  return ss.getSheetByName('Config');
+  return getWorkbook_().getSheetByName('Config');
 }
 
 function getItemsSheet_() {
-  const ss = getWorkbook_();
-  seedDefaultsIfEmpty_(ss);
-  return ss.getSheetByName('Items');
+  return getWorkbook_().getSheetByName('Items');
 }
 
 function getSheetUrl() {
@@ -197,107 +294,6 @@ function safeParse_(cell) {
     return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : null;
   } catch (e) {
     return null;
-  }
-}
-
-// ---------- Seeder -------------------------------------------------------
-
-function seedDefaultsIfEmpty_(ss) {
-  // --- Config sheet ---
-  let configSheet = ss.getSheetByName('Config');
-  if (!configSheet) {
-    configSheet = ss.insertSheet('Config');
-    configSheet.appendRow(CONFIG_HEADERS);
-  } else {
-    const hdr = configSheet.getRange(1, 1, 1, CONFIG_HEADERS.length).getValues()[0];
-    if (hdr.join('|') !== CONFIG_HEADERS.join('|')) {
-      configSheet.clear();
-      configSheet.appendRow(CONFIG_HEADERS);
-    }
-  }
-
-  // Determine the admin email for seeding.
-  let adminEmail = '';
-  try {
-    adminEmail = Session.getEffectiveUser().getEmail();
-  } catch (e) {
-    adminEmail = '';
-  }
-  if (!adminEmail) {
-    try {
-      adminEmail = Session.getActiveUser().getEmail();
-    } catch (e) {
-      adminEmail = '';
-    }
-  }
-
-  const defaultConfigRows = [
-    ['title',              'Prioritize'],
-    ['subtitle',           ''],
-    ['blurb',              DEFAULT_BLURB],
-    ['mode',               'moscow'],
-    ['buckets_json',       JSON.stringify(DEFAULT_BUCKETS)],
-    ['results_visibility', 'always'],
-    ['anonymous',          'false'],
-    ['admin_emails',       adminEmail],
-  ];
-
-  // Read existing keys so we only add missing ones.
-  const lastConfigRow = configSheet.getLastRow();
-  const existingKeys = {};
-  if (lastConfigRow >= 2) {
-    const existing = configSheet.getRange(2, 1, lastConfigRow - 1, 2).getValues();
-    existing.forEach(function(row) {
-      if (row[0]) existingKeys[String(row[0])] = true;
-    });
-  }
-
-  defaultConfigRows.forEach(function(pair) {
-    if (!existingKeys[pair[0]]) {
-      configSheet.appendRow(pair);
-    }
-  });
-
-  // --- Items sheet ---
-  let itemsSheet = ss.getSheetByName('Items');
-  if (!itemsSheet) {
-    itemsSheet = ss.insertSheet('Items');
-    itemsSheet.appendRow(ITEMS_HEADERS);
-  } else {
-    const hdr = itemsSheet.getRange(1, 1, 1, ITEMS_HEADERS.length).getValues()[0];
-    if (hdr.join('|') !== ITEMS_HEADERS.join('|')) {
-      itemsSheet.clear();
-      itemsSheet.appendRow(ITEMS_HEADERS);
-    }
-  }
-
-  const lastItemRow = itemsSheet.getLastRow();
-  const freshItems = lastItemRow < 2;
-  if (freshItems) {
-    DEFAULT_ITEMS.forEach(function(item, index) {
-      itemsSheet.appendRow([item.id, item.name, '', index]);
-    });
-  }
-
-  // --- Submissions sheet ---
-  let subSheet = ss.getSheetByName('Submissions');
-  if (!subSheet) {
-    subSheet = ss.insertSheet('Submissions');
-    subSheet.appendRow(HEADERS);
-  }
-
-  // Seed example submissions only on a fully fresh install (items were just created).
-  if (freshItems && subSheet.getLastRow() < 2) {
-    const now = new Date();
-    const exampleSubmissions = [
-      ['alice@example.com',  'Alice',  { sso: 'must', mobile_app: 'must', dark_mode: 'should', api_v2: 'should', audit_log: 'could', bulk_import: 'could', chat_ops: 'wont', ai_assist: 'wont' }],
-      ['bob@example.com',    'Bob',    { sso: 'must', api_v2: 'must', audit_log: 'should', chat_ops: 'should', mobile_app: 'could', bulk_import: 'could', dark_mode: 'wont', ai_assist: 'wont' }],
-      ['carol@example.com',  'Carol',  { api_v2: 'must', audit_log: 'must', sso: 'should', ai_assist: 'should', chat_ops: 'could', bulk_import: 'could', mobile_app: 'wont', dark_mode: 'wont' }],
-      ['dave@example.com',   'Dave',   { sso: 'must', chat_ops: 'must', api_v2: 'should', ai_assist: 'should', audit_log: 'could', mobile_app: 'could', bulk_import: 'wont', dark_mode: 'wont' }],
-    ];
-    exampleSubmissions.forEach(function(row) {
-      subSheet.appendRow([now, row[0], row[1], JSON.stringify(row[2])]);
-    });
   }
 }
 
@@ -384,6 +380,7 @@ function getItemsFromSheet_() {
 
 // Writes config values back to the Config sheet.
 function saveConfig(payload) {
+  ensureInstalled_();
   if (!isAdmin_()) {
     throw new Error('Not authorized — admin access required.');
   }
@@ -561,6 +558,7 @@ function validateAssignments_(assignments) {
  * to render the first paint (config + identity + prior submission).
  */
 function getBoot() {
+  ensureInstalled_();
   const me = getCurrentUser_();
   return {
     config: getConfig_(),
@@ -586,6 +584,7 @@ function findSubmissionByEmail_(email) {
 }
 
 function saveSubmission(payload) {
+  ensureInstalled_();
   const me = getCurrentUser_();
   const assignments = payload && payload.assignments;
   validateAssignments_(assignments);
@@ -618,6 +617,7 @@ function saveSubmission(payload) {
 }
 
 function deleteAllSubmissions() {
+  ensureInstalled_();
   if (!isAdmin_()) {
     throw new Error('Not authorized — admin access required.');
   }
@@ -636,6 +636,7 @@ function deleteAllSubmissions() {
 }
 
 function deleteMySubmission() {
+  ensureInstalled_();
   const me = getCurrentUser_();
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -652,6 +653,7 @@ function deleteMySubmission() {
 }
 
 function getResults() {
+  ensureInstalled_();
   const cfg = getConfigFromSheet_();
   const admin = isAdmin_();
 
@@ -694,6 +696,7 @@ function getResults() {
 }
 
 function getAdminBoot() {
+  ensureInstalled_();
   if (!isAdmin_()) {
     throw new Error('Not authorized — admin access required.');
   }
