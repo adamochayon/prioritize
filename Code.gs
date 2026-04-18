@@ -388,21 +388,16 @@ function saveConfig(payload) {
   }
   if (!payload || typeof payload !== 'object') throw new Error('Invalid payload');
 
-  // --- Mode-change guard ---
-  const currentCfg = getConfigFromSheet_();
-  const currentMode = currentCfg.mode;
-  const newMode = payload.mode !== undefined ? String(payload.mode) : currentMode;
-  const modeChanging = newMode !== currentMode;
-
-  if (modeChanging && !payload.confirmSubmissionsWipe) {
-    throw new Error('MODE_CHANGE_NEEDS_CONFIRM');
-  }
-
-  // --- Determine effective item count (use incoming items if provided, else current sheet) ---
+  // --- Stateless cap validation (no sheet mutation; safe outside the lock) ---
+  // Determine effective item count for validation only.
   const effectiveItems = payload.items !== undefined ? payload.items : getItemsFromSheet_();
 
+  // Derive the intended mode for validation purposes (may be stale re: modeChanging,
+  // but the authoritative check happens inside the lock).
+  const newModeForValidation = payload.mode !== undefined ? String(payload.mode) : null;
+
   // --- MoSCoW cap-sum validation ---
-  if (payload.buckets !== undefined && newMode !== 'topn') {
+  if (payload.buckets !== undefined && newModeForValidation !== 'topn') {
     const buckets = payload.buckets;
     for (const b of buckets) {
       if (!b.cap || Number(b.cap) < 1) {
@@ -421,7 +416,7 @@ function saveConfig(payload) {
   }
 
   // --- Top-N cap validation ---
-  if (payload.buckets !== undefined && newMode === 'topn') {
+  if (payload.buckets !== undefined && newModeForValidation === 'topn') {
     const topBucket = payload.buckets.find(function(b) { return b.id === 'top'; });
     if (topBucket) {
       if (!(topBucket.cap >= 1 && topBucket.cap <= effectiveItems.length)) {
@@ -432,55 +427,61 @@ function saveConfig(payload) {
     }
   }
 
-  const sheet = getConfigSheet_();
-  const last = sheet.getLastRow();
-  if (last < 2) return { ok: true };
+  // --- Acquire a single lock that spans all mutations ---
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    // --- Read current mode inside the lock to avoid a TOCTOU on modeChanging ---
+    const currentCfg = getConfigFromSheet_();
+    const currentMode = currentCfg.mode;
+    const newMode = payload.mode !== undefined ? String(payload.mode) : currentMode;
+    const modeChanging = newMode !== currentMode;
 
-  const rows = sheet.getRange(2, 1, last - 1, 2).getValues();
+    // --- Mode-change guard (confirm flag check inside lock for consistent modeChanging) ---
+    if (modeChanging && !payload.confirmSubmissionsWipe) {
+      throw new Error('MODE_CHANGE_NEEDS_CONFIRM');
+    }
 
-  // --- If mode is changing, wipe Submissions first ---
-  if (modeChanging) {
-    const lock = LockService.getScriptLock();
-    lock.waitLock(10000);
-    try {
+    // --- If mode is changing, wipe Submissions first ---
+    if (modeChanging) {
       const subSheet = getSubmissionsSheet_();
       const lastSub = subSheet.getLastRow();
       if (lastSub >= 2) {
         subSheet.deleteRows(2, lastSub - 1);
       }
-    } finally {
-      lock.releaseLock();
     }
-  }
 
-  // --- When switching Top-N → MoSCoW with empty/no buckets, re-seed MoSCoW defaults ---
-  let bucketsToSave = payload.buckets;
-  if (modeChanging && newMode === 'moscow' && (!bucketsToSave || bucketsToSave.length === 0)) {
-    bucketsToSave = DEFAULT_BUCKETS;
-  }
+    const sheet = getConfigSheet_();
+    const last = sheet.getLastRow();
+    if (last >= 2) {
+      const rows = sheet.getRange(2, 1, last - 1, 2).getValues();
 
-  const updates = {};
-  if (payload.title       !== undefined) updates['title']              = String(payload.title);
-  if (payload.subtitle    !== undefined) updates['subtitle']           = String(payload.subtitle);
-  if (payload.blurb       !== undefined) updates['blurb']              = String(payload.blurb);
-  if (payload.mode        !== undefined) updates['mode']               = String(payload.mode);
-  if (bucketsToSave       !== undefined) updates['buckets_json']       = JSON.stringify(bucketsToSave);
-  if (payload.resultsVisibility !== undefined) updates['results_visibility'] = String(payload.resultsVisibility);
-  if (payload.anonymous   !== undefined) updates['anonymous']          = String(!!payload.anonymous);
-  if (payload.adminEmails !== undefined) updates['admin_emails']       = Array.isArray(payload.adminEmails) ? payload.adminEmails.join('\n') : String(payload.adminEmails);
+      // --- When switching Top-N → MoSCoW with empty/no buckets, re-seed MoSCoW defaults ---
+      let bucketsToSave = payload.buckets;
+      if (modeChanging && newMode === 'moscow' && (!bucketsToSave || bucketsToSave.length === 0)) {
+        bucketsToSave = DEFAULT_BUCKETS;
+      }
 
-  rows.forEach(function(row, i) {
-    const key = String(row[0]);
-    if (updates[key] !== undefined) {
-      sheet.getRange(i + 2, 2).setValue(updates[key]);
+      const updates = {};
+      if (payload.title       !== undefined) updates['title']              = String(payload.title);
+      if (payload.subtitle    !== undefined) updates['subtitle']           = String(payload.subtitle);
+      if (payload.blurb       !== undefined) updates['blurb']              = String(payload.blurb);
+      if (payload.mode        !== undefined) updates['mode']               = String(payload.mode);
+      if (bucketsToSave       !== undefined) updates['buckets_json']       = JSON.stringify(bucketsToSave);
+      if (payload.resultsVisibility !== undefined) updates['results_visibility'] = String(payload.resultsVisibility);
+      if (payload.anonymous   !== undefined) updates['anonymous']          = String(!!payload.anonymous);
+      if (payload.adminEmails !== undefined) updates['admin_emails']       = Array.isArray(payload.adminEmails) ? payload.adminEmails.join('\n') : String(payload.adminEmails);
+
+      rows.forEach(function(row, i) {
+        const key = String(row[0]);
+        if (updates[key] !== undefined) {
+          sheet.getRange(i + 2, 2).setValue(updates[key]);
+        }
+      });
     }
-  });
 
-  // --- Write items to Items sheet if provided ---
-  if (payload.items !== undefined) {
-    const lock = LockService.getScriptLock();
-    lock.waitLock(10000);
-    try {
+    // --- Write items to Items sheet if provided ---
+    if (payload.items !== undefined) {
       const itemsSheet = getItemsSheet_();
       const lastItem = itemsSheet.getLastRow();
       if (lastItem >= 2) {
@@ -497,9 +498,9 @@ function saveConfig(payload) {
       if (itemRows.length > 0) {
         itemsSheet.getRange(2, 1, itemRows.length, 4).setValues(itemRows);
       }
-    } finally {
-      lock.releaseLock();
     }
+  } finally {
+    lock.releaseLock();
   }
 
   return { ok: true };
