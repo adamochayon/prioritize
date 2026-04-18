@@ -2,7 +2,7 @@
 
 A Google Apps Script tool for force-ranking team priorities into buckets — no hosting, no build step.
 
-![Prioritize screenshot](docs/screenshot.png)
+<!-- TODO: add screenshot -->
 
 ## Why this exists
 

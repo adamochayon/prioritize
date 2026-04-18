@@ -43,7 +43,7 @@ const HEADERS = ['timestamp', 'email', 'display_name', 'assignments_json'];
 const CONFIG_HEADERS = ['key', 'value'];
 const ITEMS_HEADERS  = ['id', 'name', 'description', 'order'];
 
-const DEFAULT_BLURB = 'More priorities than bandwidth — this exercise forces explicit bets. Drag each item into one of four buckets: Must have (your top 3 bets), Should have (4 items), Could have (4 items), or Won\'t have (5 things we\'re explicitly deprioritizing for now). Save anytime — resubmit to update. Results aggregate across everyone so we can see where we agree and where we don\'t.';
+const DEFAULT_BLURB = 'Rank these items into buckets to see where the group agrees and where it splits. Save anytime — resubmit to update.';
 
 // ---------- Web app entry ------------------------------------------------
 
@@ -233,7 +233,7 @@ function seedDefaultsIfEmpty_(ss) {
 
   const defaultConfigRows = [
     ['title',              'Prioritize'],
-    ['subtitle',           'Rank the items below'],
+    ['subtitle',           ''],
     ['blurb',              DEFAULT_BLURB],
     ['mode',               'moscow'],
     ['buckets_json',       JSON.stringify(DEFAULT_BUCKETS)],
@@ -286,7 +286,7 @@ function getConfigFromSheet_() {
   const last = sheet.getLastRow();
   const defaults = {
     title: 'Prioritize',
-    subtitle: 'Rank the items below',
+    subtitle: '',
     blurb: DEFAULT_BLURB,
     mode: 'moscow',
     buckets: DEFAULT_BUCKETS,
