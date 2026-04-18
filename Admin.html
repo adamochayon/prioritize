@@ -824,6 +824,22 @@
         payload.confirmSubmissionsWipe = true;
       }
 
+      // Detect items-set change (additions/deletions only; renames and reorders don't count).
+      var bootItemIds = new Set((boot && boot.config && boot.config.items || []).map(function(i) { return i.id; }));
+      var newItemIds  = new Set(items.map(function(i) { return i.id; }));
+      var itemsChanging = bootItemIds.size !== newItemIds.size;
+      if (!itemsChanging) {
+        bootItemIds.forEach(function(id) { if (!newItemIds.has(id)) itemsChanging = true; });
+      }
+      if (itemsChanging) {
+        var iSubCount = (boot && boot.stats && boot.stats.submissionCount) || 0;
+        if (iSubCount > 0) {
+          var iMsg = 'Changing items will clear all ' + iSubCount + ' existing submission' + (iSubCount === 1 ? '' : 's') + '. Continue?';
+          if (!confirm(iMsg)) return;
+          payload.confirmItemsChangeWipe = true;
+        }
+      }
+
       var btn = document.getElementById('save-btn');
       btn.disabled = true;
 

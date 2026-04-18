@@ -433,19 +433,41 @@ function saveConfig(payload) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    // --- Read current mode inside the lock to avoid a TOCTOU on modeChanging ---
+    // --- Read current mode and items inside the lock to avoid TOCTOU ---
     const currentCfg = getConfig_();
     const currentMode = currentCfg.mode;
     const newMode = payload.mode !== undefined ? String(payload.mode) : currentMode;
     const modeChanging = newMode !== currentMode;
 
-    // --- Mode-change guard (confirm flag check inside lock for consistent modeChanging) ---
+    // --- Items-change detection (set membership only; renames/reorders don't count) ---
+    let itemsChanging = false;
+    if (payload.items !== undefined) {
+      const currentItems = getItemsFromSheet_();
+      const currentIds = new Set(currentItems.map(function(i) { return i.id; }));
+      const newIds = new Set(payload.items.map(function(i) { return String(i.id || '').trim(); }).filter(Boolean));
+      if (currentIds.size !== newIds.size) {
+        itemsChanging = true;
+      } else {
+        for (const id of currentIds) {
+          if (!newIds.has(id)) { itemsChanging = true; break; }
+        }
+      }
+    }
+
+    // --- Mode-change guard ---
     if (modeChanging && !payload.confirmSubmissionsWipe) {
       throw new Error('MODE_CHANGE_NEEDS_CONFIRM');
     }
 
-    // --- If mode is changing, wipe Submissions first ---
-    if (modeChanging) {
+    // --- Items-change guard ---
+    const existingRows = readAllRows_();
+    if (itemsChanging && existingRows.length > 0 && !payload.confirmItemsChangeWipe) {
+      throw new Error('ITEMS_CHANGE_NEEDS_CONFIRM');
+    }
+
+    // --- Wipe submissions if mode or items are changing (wipe once) ---
+    const shouldWipeSubmissions = (modeChanging || itemsChanging) && existingRows.length > 0;
+    if (shouldWipeSubmissions) {
       const subSheet = getSubmissionsSheet_();
       const lastSub = subSheet.getLastRow();
       if (lastSub >= 2) {
