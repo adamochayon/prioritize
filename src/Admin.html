@@ -1,1030 +1,1272 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <meta charset="utf-8">
-  <base target="_top">
-  <title>Prioritize · Admin</title>
-  <style>
-    :root {
-      --bg: #0d0f12;
-      --bg-elev: #15181d;
-      --border: #23272e;
-      --text: #e6e6e6;
-      --muted: #888;
-      --accent: #4ade80;
-      --accent-dim: rgba(74, 222, 128, 0.18);
-      --accent-dim2: rgba(74, 222, 128, 0.08);
-      --danger: #f87171;
-      --should-color: rgba(74, 222, 128, 0.45);
-      --could-color: #555;
-      --wont-color: rgba(248, 113, 113, 0.5);
-    }
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-      font-size: 15px;
-      line-height: 1.4;
-      -webkit-font-smoothing: antialiased;
-    }
-    .mono {
-      font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-      font-variant-numeric: tabular-nums;
-    }
-    main {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 24px 20px 80px;
-    }
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-    }
-    h1 {
-      font-size: 18px;
-      font-weight: 600;
-      margin: 0;
-      letter-spacing: -0.01em;
-    }
-    .section-label {
-      font-size: 12px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 10px;
-    }
-    .notice {
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      margin-bottom: 16px;
-    }
-    .notice.success { border-color: var(--accent); color: var(--accent); }
-    .notice.error   { border-color: var(--danger); color: var(--danger); }
+  <head>
+    <meta charset="utf-8" />
+    <base target="_top" />
+    <title>Prioritize · Admin</title>
+    <style>
+      :root {
+        --bg: #0d0f12;
+        --bg-elev: #15181d;
+        --border: #23272e;
+        --text: #e6e6e6;
+        --muted: #888;
+        --accent: #4ade80;
+        --accent-dim: rgba(74, 222, 128, 0.18);
+        --accent-dim2: rgba(74, 222, 128, 0.08);
+        --danger: #f87171;
+        --should-color: rgba(74, 222, 128, 0.45);
+        --could-color: #555;
+        --wont-color: rgba(248, 113, 113, 0.5);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        font-size: 15px;
+        line-height: 1.4;
+        -webkit-font-smoothing: antialiased;
+      }
+      .mono {
+        font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+        font-variant-numeric: tabular-nums;
+      }
+      main {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 24px 20px 80px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+      }
+      h1 {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .section-label {
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 10px;
+      }
+      .notice {
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        margin-bottom: 16px;
+      }
+      .notice.success {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .notice.error {
+        border-color: var(--danger);
+        color: var(--danger);
+      }
 
-    /* Results */
-    .result-row {
-      padding: 12px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .result-head {
-      display: flex;
-      align-items: baseline;
-      gap: 10px;
-    }
-    .result-rank {
-      color: var(--accent);
-      font-size: 16px;
-      min-width: 28px;
-    }
-    .result-name { flex: 1; }
-    .result-score { color: var(--accent); }
-    .result-meta {
-      color: var(--muted);
-      font-size: 12px;
-      margin-left: 6px;
-    }
-    .dist-bar {
-      height: 4px;
-      display: flex;
-      margin: 6px 0 0 38px;
-      max-width: calc(100% - 38px);
-      overflow: hidden;
-    }
-    .dist-segment { height: 100%; }
-    .dist-segment.must   { background: var(--accent); }
-    .dist-segment.should { background: var(--should-color); }
-    .dist-segment.could  { background: var(--could-color); }
-    .dist-segment.wont   { background: var(--wont-color); }
-    .voter-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-left: 38px;
-      margin-top: 6px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-    .voter-chip .voter-name { color: #aaa; }
-    .voter-chip .bucket-letter { font-weight: 700; }
-    .voter-chip .bucket-letter.must   { color: var(--accent); }
-    .voter-chip .bucket-letter.should { color: var(--should-color); }
-    .voter-chip .bucket-letter.could  { color: var(--muted); }
-    .voter-chip .bucket-letter.wont   { color: var(--danger); }
+      /* Results */
+      .result-row {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .result-head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+      .result-rank {
+        color: var(--accent);
+        font-size: 16px;
+        min-width: 28px;
+      }
+      .result-name {
+        flex: 1;
+      }
+      .result-score {
+        color: var(--accent);
+      }
+      .result-meta {
+        color: var(--muted);
+        font-size: 12px;
+        margin-left: 6px;
+      }
+      .dist-bar {
+        height: 4px;
+        display: flex;
+        margin: 6px 0 0 38px;
+        max-width: calc(100% - 38px);
+        overflow: hidden;
+      }
+      .dist-segment {
+        height: 100%;
+      }
+      .dist-segment.must {
+        background: var(--accent);
+      }
+      .dist-segment.should {
+        background: var(--should-color);
+      }
+      .dist-segment.could {
+        background: var(--could-color);
+      }
+      .dist-segment.wont {
+        background: var(--wont-color);
+      }
+      .voter-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-left: 38px;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .voter-chip .voter-name {
+        color: #aaa;
+      }
+      .voter-chip .bucket-letter {
+        font-weight: 700;
+      }
+      .voter-chip .bucket-letter.must {
+        color: var(--accent);
+      }
+      .voter-chip .bucket-letter.should {
+        color: var(--should-color);
+      }
+      .voter-chip .bucket-letter.could {
+        color: var(--muted);
+      }
+      .voter-chip .bucket-letter.wont {
+        color: var(--danger);
+      }
 
-    details.submissions {
-      margin-top: 32px;
-      color: var(--muted);
-    }
-    details.submissions summary { cursor: pointer; }
-    details.submissions .submission {
-      margin: 12px 0;
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-    }
-    details.submissions .submission h4 {
-      margin: 0 0 8px;
-      color: var(--text);
-      font-size: 14px;
-    }
-    .sub-bucket-group { margin-bottom: 8px; }
-    .sub-bucket-label {
-      font-size: 11px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 3px;
-    }
-    .sub-bucket-items {
-      margin: 0;
-      padding: 0 0 0 12px;
-      list-style: disc;
-    }
-    .sub-bucket-items li { margin: 1px 0; font-size: 13px; }
+      details.submissions {
+        margin-top: 32px;
+        color: var(--muted);
+      }
+      details.submissions summary {
+        cursor: pointer;
+      }
+      details.submissions .submission {
+        margin: 12px 0;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+      }
+      details.submissions .submission h4 {
+        margin: 0 0 8px;
+        color: var(--text);
+        font-size: 14px;
+      }
+      .sub-bucket-group {
+        margin-bottom: 8px;
+      }
+      .sub-bucket-label {
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 3px;
+      }
+      .sub-bucket-items {
+        margin: 0;
+        padding: 0 0 0 12px;
+        list-style: disc;
+      }
+      .sub-bucket-items li {
+        margin: 1px 0;
+        font-size: 13px;
+      }
 
-    .loading { color: var(--muted); padding: 20px 0; }
-    .hidden { display: none !important; }
+      .loading {
+        color: var(--muted);
+        padding: 20px 0;
+      }
+      .hidden {
+        display: none !important;
+      }
 
-    /* Admin-specific */
-    .view-link {
-      font-size: 13px;
-      color: var(--accent);
-      text-decoration: none;
-    }
-    .view-link:hover { text-decoration: underline; }
+      /* Admin-specific */
+      .view-link {
+        font-size: 13px;
+        color: var(--accent);
+        text-decoration: none;
+      }
+      .view-link:hover {
+        text-decoration: underline;
+      }
 
-    .data-strip {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 12px 14px;
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      margin-bottom: 28px;
-      font-size: 13px;
-      flex-wrap: wrap;
-    }
-    .data-strip .stat { color: var(--muted); }
-    .data-strip .stat strong { color: var(--text); font-variant-numeric: tabular-nums; }
-    .data-strip .spacer { flex: 1; }
-    .sheet-link {
-      font-size: 13px;
-      color: var(--accent);
-      text-decoration: none;
-      border: 1px solid var(--accent);
-      padding: 6px 12px;
-      white-space: nowrap;
-    }
-    .sheet-link:hover { background: var(--accent-dim2); }
+      .data-strip {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 12px 14px;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        margin-bottom: 28px;
+        font-size: 13px;
+        flex-wrap: wrap;
+      }
+      .data-strip .stat {
+        color: var(--muted);
+      }
+      .data-strip .stat strong {
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+      }
+      .data-strip .spacer {
+        flex: 1;
+      }
+      .sheet-link {
+        font-size: 13px;
+        color: var(--accent);
+        text-decoration: none;
+        border: 1px solid var(--accent);
+        padding: 6px 12px;
+        white-space: nowrap;
+      }
+      .sheet-link:hover {
+        background: var(--accent-dim2);
+      }
 
-    .admin-section {
-      border-top: 1px solid var(--border);
-      padding-top: 28px;
-      margin-top: 28px;
-    }
-    .admin-section-title {
-      font-size: 14px;
-      font-weight: 600;
-      margin: 0 0 20px;
-    }
+      .admin-section {
+        border-top: 1px solid var(--border);
+        padding-top: 28px;
+        margin-top: 28px;
+      }
+      .admin-section-title {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0 0 20px;
+      }
 
-    .config-form {
-      max-width: 640px;
-    }
-    .field {
-      margin-bottom: 18px;
-    }
-    .field label {
-      display: block;
-      font-size: 11px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 6px;
-    }
-    .field input[type="text"],
-    .field input[type="number"],
-    .field textarea {
-      display: block;
-      width: 100%;
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font: inherit;
-      font-size: 14px;
-      padding: 8px 10px;
-      outline: none;
-    }
-    .field input[type="text"]:focus,
-    .field input[type="number"]:focus,
-    .field textarea:focus {
-      border-color: var(--accent);
-    }
-    .field textarea { resize: vertical; }
-    .field input[type="number"] { max-width: 100px; }
+      .config-form {
+        max-width: 640px;
+      }
+      .field {
+        margin-bottom: 18px;
+      }
+      .field label {
+        display: block;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .field input[type='text'],
+      .field input[type='number'],
+      .field textarea {
+        display: block;
+        width: 100%;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        color: var(--text);
+        font: inherit;
+        font-size: 14px;
+        padding: 8px 10px;
+        outline: none;
+      }
+      .field input[type='text']:focus,
+      .field input[type='number']:focus,
+      .field textarea:focus {
+        border-color: var(--accent);
+      }
+      .field textarea {
+        resize: vertical;
+      }
+      .field input[type='number'] {
+        max-width: 100px;
+      }
 
-    .radio-group {
-      display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
-    }
-    .radio-group label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 14px;
-      letter-spacing: 0;
-      text-transform: none;
-      color: var(--text);
-      cursor: pointer;
-    }
-    .radio-group input[type="radio"] { accent-color: var(--accent); cursor: pointer; }
+      .radio-group {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .radio-group label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 14px;
+        letter-spacing: 0;
+        text-transform: none;
+        color: var(--text);
+        cursor: pointer;
+      }
+      .radio-group input[type='radio'] {
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
 
-    .checkbox-label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 14px;
-      color: var(--text);
-      cursor: pointer;
-    }
-    .checkbox-label input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; width: 16px; height: 16px; }
+      .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: var(--text);
+        cursor: pointer;
+      }
+      .checkbox-label input[type='checkbox'] {
+        accent-color: var(--accent);
+        cursor: pointer;
+        width: 16px;
+        height: 16px;
+      }
 
-    /* Bucket editor */
-    .bucket-editor-row {
-      display: grid;
-      grid-template-columns: 1fr 70px 70px;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-    .bucket-editor-row input[type="text"],
-    .bucket-editor-row input[type="number"] {
-      width: 100%;
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font: inherit;
-      font-size: 14px;
-      padding: 7px 10px;
-      outline: none;
-    }
-    .bucket-editor-row input[type="text"]:focus,
-    .bucket-editor-row input[type="number"]:focus { border-color: var(--accent); }
-    .bucket-editor-header {
-      display: grid;
-      grid-template-columns: 1fr 70px 70px;
-      gap: 8px;
-      margin-bottom: 4px;
-    }
-    .bucket-editor-header span {
-      font-size: 11px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
+      /* Bucket editor */
+      .bucket-editor-row {
+        display: grid;
+        grid-template-columns: 1fr 70px 70px;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .bucket-editor-row input[type='text'],
+      .bucket-editor-row input[type='number'] {
+        width: 100%;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        color: var(--text);
+        font: inherit;
+        font-size: 14px;
+        padding: 7px 10px;
+        outline: none;
+      }
+      .bucket-editor-row input[type='text']:focus,
+      .bucket-editor-row input[type='number']:focus {
+        border-color: var(--accent);
+      }
+      .bucket-editor-header {
+        display: grid;
+        grid-template-columns: 1fr 70px 70px;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      .bucket-editor-header span {
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
 
-    /* Item editor */
-    .item-editor-row {
-      display: grid;
-      grid-template-columns: auto auto 1fr auto;
-      gap: 6px;
-      align-items: center;
-      margin-bottom: 6px;
-    }
-    .item-editor-row input[type="text"] {
-      width: 100%;
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font: inherit;
-      font-size: 14px;
-      padding: 7px 10px;
-      outline: none;
-    }
-    .item-editor-row input[type="text"]:focus { border-color: var(--accent); }
-    .icon-btn {
-      background: none;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      cursor: pointer;
-      font: inherit;
-      font-size: 14px;
-      padding: 6px 8px;
-      line-height: 1;
-    }
-    .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
-    .icon-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
-    .add-row-btn {
-      background: none;
-      border: 1px dashed var(--border);
-      color: var(--muted);
-      cursor: pointer;
-      font: inherit;
-      font-size: 13px;
-      padding: 8px 12px;
-      margin-top: 4px;
-      width: 100%;
-      text-align: left;
-    }
-    .add-row-btn:hover { border-color: var(--accent); color: var(--accent); }
+      /* Item editor */
+      .item-editor-row {
+        display: grid;
+        grid-template-columns: auto auto 1fr auto;
+        gap: 6px;
+        align-items: center;
+        margin-bottom: 6px;
+      }
+      .item-editor-row input[type='text'] {
+        width: 100%;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        color: var(--text);
+        font: inherit;
+        font-size: 14px;
+        padding: 7px 10px;
+        outline: none;
+      }
+      .item-editor-row input[type='text']:focus {
+        border-color: var(--accent);
+      }
+      .icon-btn {
+        background: none;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: 14px;
+        padding: 6px 8px;
+        line-height: 1;
+      }
+      .icon-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .icon-btn.danger:hover {
+        border-color: var(--danger);
+        color: var(--danger);
+      }
+      .add-row-btn {
+        background: none;
+        border: 1px dashed var(--border);
+        color: var(--muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: 13px;
+        padding: 8px 12px;
+        margin-top: 4px;
+        width: 100%;
+        text-align: left;
+      }
+      .add-row-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
 
-    .save-btn {
-      background: var(--accent);
-      color: #0d0f12;
-      border: none;
-      font: inherit;
-      font-weight: 600;
-      padding: 12px 24px;
-      cursor: pointer;
-      margin-top: 8px;
-    }
-    .save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .save-btn:hover:not(:disabled) { filter: brightness(1.1); }
+      .save-btn {
+        background: var(--accent);
+        color: #0d0f12;
+        border: none;
+        font: inherit;
+        font-weight: 600;
+        padding: 12px 24px;
+        cursor: pointer;
+        margin-top: 8px;
+      }
+      .save-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .save-btn:hover:not(:disabled) {
+        filter: brightness(1.1);
+      }
 
-    .warning-text {
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 6px;
-    }
+      .warning-text {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 6px;
+      }
 
-    .danger-zone {
-      border-top-color: var(--danger);
-    }
-    .danger-btn {
-      background: none;
-      border: 1px solid var(--danger);
-      color: var(--danger);
-      font: inherit;
-      font-size: 14px;
-      padding: 10px 20px;
-      cursor: pointer;
-      margin-top: 10px;
-    }
-    .danger-btn:hover { background: rgba(248, 113, 113, 0.1); }
-    .danger-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+      .danger-zone {
+        border-top-color: var(--danger);
+      }
+      .danger-btn {
+        background: none;
+        border: 1px solid var(--danger);
+        color: var(--danger);
+        font: inherit;
+        font-size: 14px;
+        padding: 10px 20px;
+        cursor: pointer;
+        margin-top: 10px;
+      }
+      .danger-btn:hover {
+        background: rgba(248, 113, 113, 0.1);
+      }
+      .danger-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
 
-    @media (max-width: 600px) {
-      .caps-grid { grid-template-columns: repeat(2, 1fr); }
-      .data-strip { flex-direction: column; align-items: flex-start; }
-    }
-  </style>
-</head>
-<body>
-  <main>
-    <header>
-      <h1 id="page-title">Admin</h1>
-      <a id="view-ranking-link" href="#" target="_top" class="view-link">View ranking &rarr;</a>
-    </header>
+      @media (max-width: 600px) {
+        .caps-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .data-strip {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1 id="page-title">Admin</h1>
+        <a id="view-ranking-link" href="#" target="_top" class="view-link">View ranking &rarr;</a>
+      </header>
 
-    <div id="boot-loading" class="loading">Loading&hellip;</div>
-    <div id="boot-error" class="notice error hidden"></div>
+      <div id="boot-loading" class="loading">Loading&hellip;</div>
+      <div id="boot-error" class="notice error hidden"></div>
 
-    <div id="admin-body" class="hidden">
-
-      <!-- Data strip -->
-      <div class="data-strip">
-        <span class="stat">Submissions: <strong id="stat-submissions">0</strong></span>
-        <span class="stat">Items: <strong id="stat-items">0</strong></span>
-        <span class="spacer"></span>
-        <a id="sheet-link" href="#" target="_blank" class="sheet-link">Open backing Google Sheet &uarr;</a>
-      </div>
-
-      <!-- Config form -->
-      <div class="config-form">
-        <div class="section-label">Configuration</div>
-
-        <div class="field">
-          <label for="cfg-title">Title</label>
-          <input type="text" id="cfg-title">
+      <div id="admin-body" class="hidden">
+        <!-- Data strip -->
+        <div class="data-strip">
+          <span class="stat">Submissions: <strong id="stat-submissions">0</strong></span>
+          <span class="stat">Items: <strong id="stat-items">0</strong></span>
+          <span class="spacer"></span>
+          <a id="sheet-link" href="#" target="_blank" class="sheet-link"
+            >Open backing Google Sheet &uarr;</a
+          >
         </div>
 
-        <div class="field">
-          <label for="cfg-subtitle">Subtitle</label>
-          <input type="text" id="cfg-subtitle">
-        </div>
-
-        <div class="field">
-          <label for="cfg-blurb">Blurb</label>
-          <textarea id="cfg-blurb" rows="4"></textarea>
-        </div>
-
-        <div class="field">
-          <label>Mode</label>
-          <div class="radio-group">
-            <label><input type="radio" name="mode" value="moscow"> MoSCoW</label>
-            <label><input type="radio" name="mode" value="topn"> Top-N</label>
-          </div>
-        </div>
-
-        <div class="field" id="topn-field" style="display:none">
-          <label for="cfg-topn">N (how many items count as "Top")</label>
-          <input type="number" id="cfg-topn" min="1" max="20" value="5">
-        </div>
-
-        <div class="field" id="caps-field">
-          <label>Buckets</label>
-          <div class="bucket-editor-header">
-            <span>Label</span>
-            <span>Weight</span>
-            <span>Cap</span>
-          </div>
-          <div id="bucket-editor-rows"></div>
-        </div>
-
-        <div class="field">
-          <label>Results visibility</label>
-          <div class="radio-group">
-            <label><input type="radio" name="results_visibility" value="always"> Always</label>
-            <label><input type="radio" name="results_visibility" value="after_submit"> After you submit</label>
-            <label><input type="radio" name="results_visibility" value="admin_only"> Admin only</label>
-          </div>
-        </div>
-
-        <div class="field">
-          <label class="checkbox-label">
-            <input type="checkbox" id="cfg-anonymous">
-            Hide submitter names in results
-          </label>
-        </div>
-
-        <div class="field">
-          <label for="cfg-admin-emails">Admin emails (one per line)</label>
-          <textarea id="cfg-admin-emails" rows="4"></textarea>
-          <p class="warning-text">Removing yourself from this list will lock you out of the admin view immediately.</p>
-        </div>
-
-        <div id="save-notice" class="notice hidden"></div>
-        <button class="save-btn" id="save-btn">Save config</button>
-      </div>
-
-      <!-- Items section -->
-      <div class="admin-section">
-        <div class="admin-section-title">Items</div>
+        <!-- Config form -->
         <div class="config-form">
-          <div id="item-editor-rows"></div>
-          <button type="button" class="add-row-btn" id="add-item-btn">+ Add item</button>
+          <div class="section-label">Configuration</div>
+
+          <div class="field">
+            <label for="cfg-title">Title</label>
+            <input type="text" id="cfg-title" />
+          </div>
+
+          <div class="field">
+            <label for="cfg-subtitle">Subtitle</label>
+            <input type="text" id="cfg-subtitle" />
+          </div>
+
+          <div class="field">
+            <label for="cfg-blurb">Blurb</label>
+            <textarea id="cfg-blurb" rows="4"></textarea>
+          </div>
+
+          <div class="field">
+            <label>Mode</label>
+            <div class="radio-group">
+              <label><input type="radio" name="mode" value="moscow" /> MoSCoW</label>
+              <label><input type="radio" name="mode" value="topn" /> Top-N</label>
+            </div>
+          </div>
+
+          <div class="field" id="topn-field" style="display: none">
+            <label for="cfg-topn">N (how many items count as "Top")</label>
+            <input type="number" id="cfg-topn" min="1" max="20" value="5" />
+          </div>
+
+          <div class="field" id="caps-field">
+            <label>Buckets</label>
+            <div class="bucket-editor-header">
+              <span>Label</span>
+              <span>Weight</span>
+              <span>Cap</span>
+            </div>
+            <div id="bucket-editor-rows"></div>
+          </div>
+
+          <div class="field">
+            <label>Results visibility</label>
+            <div class="radio-group">
+              <label><input type="radio" name="results_visibility" value="always" /> Always</label>
+              <label
+                ><input type="radio" name="results_visibility" value="after_submit" /> After you
+                submit</label
+              >
+              <label
+                ><input type="radio" name="results_visibility" value="admin_only" /> Admin
+                only</label
+              >
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="checkbox-label">
+              <input type="checkbox" id="cfg-anonymous" />
+              Hide submitter names in results
+            </label>
+          </div>
+
+          <div class="field">
+            <label for="cfg-admin-emails">Admin emails (one per line)</label>
+            <textarea id="cfg-admin-emails" rows="4"></textarea>
+            <p class="warning-text">
+              Removing yourself from this list will lock you out of the admin view immediately.
+            </p>
+          </div>
+
+          <div id="save-notice" class="notice hidden"></div>
+          <button class="save-btn" id="save-btn">Save config</button>
+        </div>
+
+        <!-- Items section -->
+        <div class="admin-section">
+          <div class="admin-section-title">Items</div>
+          <div class="config-form">
+            <div id="item-editor-rows"></div>
+            <button type="button" class="add-row-btn" id="add-item-btn">+ Add item</button>
+          </div>
+        </div>
+
+        <!-- Results section -->
+        <div class="admin-section">
+          <div class="admin-section-title">Results</div>
+          <div id="results-content" class="loading">Loading results&hellip;</div>
+        </div>
+
+        <!-- Danger zone -->
+        <div class="admin-section danger-zone">
+          <div class="admin-section-title" style="color: var(--danger)">Danger zone</div>
+          <p class="warning-text">
+            Permanently deletes all submitted rankings. This cannot be undone.
+          </p>
+          <button type="button" class="danger-btn" id="reset-all-btn">Reset all rankings</button>
+          <div id="reset-all-notice" class="notice hidden"></div>
         </div>
       </div>
+    </main>
 
-      <!-- Results section -->
-      <div class="admin-section">
-        <div class="admin-section-title">Results</div>
-        <div id="results-content" class="loading">Loading results&hellip;</div>
-      </div>
+    <script>
+      var boot = null;
+      var currentMode = 'moscow';
 
-      <!-- Danger zone -->
-      <div class="admin-section danger-zone">
-        <div class="admin-section-title" style="color: var(--danger);">Danger zone</div>
-        <p class="warning-text">Permanently deletes all submitted rankings. This cannot be undone.</p>
-        <button type="button" class="danger-btn" id="reset-all-btn">Reset all rankings</button>
-        <div id="reset-all-notice" class="notice hidden"></div>
-      </div>
+      // ---------- Boot -------------------------------------------------------
 
-    </div>
-  </main>
+      google.script.run.withSuccessHandler(onAdminBoot).withFailureHandler(onError).getAdminBoot();
 
-  <script>
-    var boot = null;
-    var currentMode = 'moscow';
+      function onAdminBoot(data) {
+        boot = data;
+        currentMode = (data.config && data.config.mode) || 'moscow';
+        document.getElementById('boot-loading').classList.add('hidden');
+        document.getElementById('admin-body').classList.remove('hidden');
 
-    // ---------- Boot -------------------------------------------------------
+        document.getElementById('page-title').textContent =
+          'Admin · ' + (data.config.title || 'Prioritize');
+        document.getElementById('stat-submissions').textContent = data.stats.submissionCount;
+        document.getElementById('stat-items').textContent = data.stats.itemCount;
+        document.getElementById('sheet-link').href = data.sheetUrl;
+        document.getElementById('view-ranking-link').href = data.webAppUrl;
 
-    google.script.run
-      .withSuccessHandler(onAdminBoot)
-      .withFailureHandler(onError)
-      .getAdminBoot();
+        populateForm(data.config);
+        populateItems(data.config.items || []);
+        loadResults();
+      }
 
-    function onAdminBoot(data) {
-      boot = data;
-      currentMode = (data.config && data.config.mode) || 'moscow';
-      document.getElementById('boot-loading').classList.add('hidden');
-      document.getElementById('admin-body').classList.remove('hidden');
+      function onError(err) {
+        document.getElementById('boot-loading').classList.add('hidden');
+        var el = document.getElementById('boot-error');
+        el.textContent = (err && err.message) || 'Failed to load.';
+        el.classList.remove('hidden');
+      }
 
-      document.getElementById('page-title').textContent = 'Admin · ' + (data.config.title || 'Prioritize');
-      document.getElementById('stat-submissions').textContent = data.stats.submissionCount;
-      document.getElementById('stat-items').textContent = data.stats.itemCount;
-      document.getElementById('sheet-link').href = data.sheetUrl;
-      document.getElementById('view-ranking-link').href = data.webAppUrl;
+      // ---------- Form population --------------------------------------------
 
-      populateForm(data.config);
-      populateItems(data.config.items || []);
-      loadResults();
-    }
+      function populateForm(cfg) {
+        document.getElementById('cfg-title').value = cfg.title || '';
+        document.getElementById('cfg-subtitle').value = cfg.subtitle || '';
+        document.getElementById('cfg-blurb').value = cfg.blurb || '';
 
-    function onError(err) {
-      document.getElementById('boot-loading').classList.add('hidden');
-      var el = document.getElementById('boot-error');
-      el.textContent = (err && err.message) || 'Failed to load.';
-      el.classList.remove('hidden');
-    }
+        var mode = cfg.mode || 'moscow';
+        document.querySelectorAll('input[name="mode"]').forEach(function (r) {
+          r.checked = r.value === mode;
+        });
+        updateModeUI(mode, cfg.buckets);
+        populateBuckets(mode === 'topn' ? CANONICAL_BUCKETS : cfg.buckets || CANONICAL_BUCKETS);
 
-    // ---------- Form population --------------------------------------------
+        var rv = cfg.resultsVisibility || 'always';
+        document.querySelectorAll('input[name="results_visibility"]').forEach(function (r) {
+          r.checked = r.value === rv;
+        });
 
-    function populateForm(cfg) {
-      document.getElementById('cfg-title').value    = cfg.title    || '';
-      document.getElementById('cfg-subtitle').value = cfg.subtitle || '';
-      document.getElementById('cfg-blurb').value    = cfg.blurb    || '';
+        document.getElementById('cfg-anonymous').checked = !!cfg.anonymous;
 
-      var mode = cfg.mode || 'moscow';
-      document.querySelectorAll('input[name="mode"]').forEach(function(r) {
-        r.checked = r.value === mode;
-      });
-      updateModeUI(mode, cfg.buckets);
-      populateBuckets(mode === 'topn' ? CANONICAL_BUCKETS : (cfg.buckets || CANONICAL_BUCKETS));
+        document.getElementById('cfg-admin-emails').value = (cfg.adminEmails || []).join('\n');
+      }
 
-      var rv = cfg.resultsVisibility || 'always';
-      document.querySelectorAll('input[name="results_visibility"]').forEach(function(r) {
-        r.checked = r.value === rv;
-      });
+      function updateModeUI(mode, buckets) {
+        var isMoscow = mode !== 'topn';
+        document.getElementById('caps-field').style.display = isMoscow ? '' : 'none';
+        document.getElementById('topn-field').style.display = isMoscow ? 'none' : '';
 
-      document.getElementById('cfg-anonymous').checked = !!cfg.anonymous;
-
-      document.getElementById('cfg-admin-emails').value =
-        (cfg.adminEmails || []).join('\n');
-    }
-
-    function updateModeUI(mode, buckets) {
-      var isMoscow = mode !== 'topn';
-      document.getElementById('caps-field').style.display  = isMoscow ? '' : 'none';
-      document.getElementById('topn-field').style.display  = isMoscow ? 'none' : '';
-
-      if (!isMoscow && buckets) {
-        var topBucket = buckets.find(function(b) { return b.id === 'top'; });
-        if (topBucket && topBucket.cap) {
-          document.getElementById('cfg-topn').value = topBucket.cap;
+        if (!isMoscow && buckets) {
+          var topBucket = buckets.find(function (b) {
+            return b.id === 'top';
+          });
+          if (topBucket && topBucket.cap) {
+            document.getElementById('cfg-topn').value = topBucket.cap;
+          }
         }
       }
 
-    }
-
-    document.querySelectorAll('input[name="mode"]').forEach(function(r) {
-      r.addEventListener('change', function() {
-        updateModeUI(r.value, null);
+      document.querySelectorAll('input[name="mode"]').forEach(function (r) {
+        r.addEventListener('change', function () {
+          updateModeUI(r.value, null);
+        });
       });
-    });
 
-    // ---------- Bucket editor ----------------------------------------------
+      // ---------- Bucket editor ----------------------------------------------
 
-    var CANONICAL_BUCKETS = [
-      { id: 'must',   label: 'Must have',   weight: 12, cap: 2 },
-      { id: 'should', label: 'Should have', weight: 6,  cap: 2 },
-      { id: 'could',  label: 'Could have',  weight: 2,  cap: 2 },
-      { id: 'wont',   label: "Won't have",  weight: 0,  cap: 2 },
-    ];
+      var CANONICAL_BUCKETS = [
+        { id: 'must', label: 'Must have', weight: 12, cap: 2 },
+        { id: 'should', label: 'Should have', weight: 6, cap: 2 },
+        { id: 'could', label: 'Could have', weight: 2, cap: 2 },
+        { id: 'wont', label: "Won't have", weight: 0, cap: 2 },
+      ];
 
-    function populateBuckets(buckets) {
-      var container = document.getElementById('bucket-editor-rows');
-      container.innerHTML = '';
-      // Always render exactly the 4 canonical MoSCoW rows in order,
-      // matching values by id from the provided list, falling back to defaults.
-      var byId = {};
-      (buckets || []).forEach(function(b) { byId[b.id] = b; });
-      CANONICAL_BUCKETS.forEach(function(def) {
-        var b = byId[def.id] || def;
-        addBucketRow(b);
-      });
-    }
-
-    function addBucketRow(bucket) {
-      var container = document.getElementById('bucket-editor-rows');
-      var row = document.createElement('div');
-      row.className = 'bucket-editor-row';
-      row.dataset.bucketId = bucket.id;
-
-      var labelInput = document.createElement('input');
-      labelInput.type = 'text';
-      labelInput.placeholder = 'Label';
-      labelInput.value = bucket.label || '';
-      labelInput.dataset.field = 'label';
-
-      var weightInput = document.createElement('input');
-      weightInput.type = 'number';
-      weightInput.placeholder = 'Wt';
-      weightInput.min = '0';
-      weightInput.max = '999';
-      weightInput.value = bucket.weight != null ? bucket.weight : '';
-      weightInput.dataset.field = 'weight';
-
-      var capInput = document.createElement('input');
-      capInput.type = 'number';
-      capInput.placeholder = 'Cap';
-      capInput.min = '1';
-      capInput.max = '999';
-      capInput.value = bucket.cap != null ? bucket.cap : '';
-      capInput.dataset.field = 'cap';
-
-      row.appendChild(labelInput);
-      row.appendChild(weightInput);
-      row.appendChild(capInput);
-      container.appendChild(row);
-    }
-
-    function collectBuckets() {
-      var modeEl = document.querySelector('input[name="mode"]:checked');
-      var mode = modeEl ? modeEl.value : 'moscow';
-      if (mode === 'topn') {
-        var n = parseInt(document.getElementById('cfg-topn').value, 10);
-        if (!(n > 0)) n = 5;
-        return [{ id: 'top', label: 'Top ' + n, weight: 1, cap: n }];
+      function populateBuckets(buckets) {
+        var container = document.getElementById('bucket-editor-rows');
+        container.innerHTML = '';
+        // Always render exactly the 4 canonical MoSCoW rows in order,
+        // matching values by id from the provided list, falling back to defaults.
+        var byId = {};
+        (buckets || []).forEach(function (b) {
+          byId[b.id] = b;
+        });
+        CANONICAL_BUCKETS.forEach(function (def) {
+          var b = byId[def.id] || def;
+          addBucketRow(b);
+        });
       }
-      // Always return the 4 canonical buckets in order, reading values from the DOM rows.
-      var buckets = [];
-      CANONICAL_BUCKETS.forEach(function(def) {
-        var row = document.querySelector('#bucket-editor-rows .bucket-editor-row[data-bucket-id="' + def.id + '"]');
-        if (!row) {
-          buckets.push(def);
+
+      function addBucketRow(bucket) {
+        var container = document.getElementById('bucket-editor-rows');
+        var row = document.createElement('div');
+        row.className = 'bucket-editor-row';
+        row.dataset.bucketId = bucket.id;
+
+        var labelInput = document.createElement('input');
+        labelInput.type = 'text';
+        labelInput.placeholder = 'Label';
+        labelInput.value = bucket.label || '';
+        labelInput.dataset.field = 'label';
+
+        var weightInput = document.createElement('input');
+        weightInput.type = 'number';
+        weightInput.placeholder = 'Wt';
+        weightInput.min = '0';
+        weightInput.max = '999';
+        weightInput.value = bucket.weight != null ? bucket.weight : '';
+        weightInput.dataset.field = 'weight';
+
+        var capInput = document.createElement('input');
+        capInput.type = 'number';
+        capInput.placeholder = 'Cap';
+        capInput.min = '1';
+        capInput.max = '999';
+        capInput.value = bucket.cap != null ? bucket.cap : '';
+        capInput.dataset.field = 'cap';
+
+        row.appendChild(labelInput);
+        row.appendChild(weightInput);
+        row.appendChild(capInput);
+        container.appendChild(row);
+      }
+
+      function collectBuckets() {
+        var modeEl = document.querySelector('input[name="mode"]:checked');
+        var mode = modeEl ? modeEl.value : 'moscow';
+        if (mode === 'topn') {
+          var n = parseInt(document.getElementById('cfg-topn').value, 10);
+          if (!(n > 0)) n = 5;
+          return [{ id: 'top', label: 'Top ' + n, weight: 1, cap: n }];
+        }
+        // Always return the 4 canonical buckets in order, reading values from the DOM rows.
+        var buckets = [];
+        CANONICAL_BUCKETS.forEach(function (def) {
+          var row = document.querySelector(
+            '#bucket-editor-rows .bucket-editor-row[data-bucket-id="' + def.id + '"]'
+          );
+          if (!row) {
+            buckets.push(def);
+            return;
+          }
+          var labelEl = row.querySelector('[data-field="label"]');
+          var weightEl = row.querySelector('[data-field="weight"]');
+          var capEl = row.querySelector('[data-field="cap"]');
+          var label = labelEl ? labelEl.value.trim() : def.label;
+          var weight = weightEl ? parseInt(weightEl.value, 10) : def.weight;
+          var cap = capEl ? parseInt(capEl.value, 10) : def.cap;
+          if (isNaN(weight)) weight = def.weight;
+          if (isNaN(cap)) cap = def.cap;
+          buckets.push({ id: def.id, label: label, weight: weight, cap: cap });
+        });
+        return buckets;
+      }
+
+      // ---------- Item editor ------------------------------------------------
+
+      function populateItems(items) {
+        var container = document.getElementById('item-editor-rows');
+        container.innerHTML = '';
+        (items || []).forEach(function (item) {
+          addItemRow(item);
+        });
+      }
+
+      function addItemRow(item) {
+        var container = document.getElementById('item-editor-rows');
+        var row = document.createElement('div');
+        row.className = 'item-editor-row';
+        // Store the stable id as a data attribute so renames preserve it
+        row.dataset.itemId = item ? item.id || '' : '';
+
+        var upBtn = document.createElement('button');
+        upBtn.type = 'button';
+        upBtn.className = 'icon-btn';
+        upBtn.textContent = '↑';
+        upBtn.title = 'Move up';
+        upBtn.addEventListener('click', function () {
+          var prev = row.previousElementSibling;
+          if (prev) container.insertBefore(row, prev);
+        });
+
+        var downBtn = document.createElement('button');
+        downBtn.type = 'button';
+        downBtn.className = 'icon-btn';
+        downBtn.textContent = '↓';
+        downBtn.title = 'Move down';
+        downBtn.addEventListener('click', function () {
+          var next = row.nextElementSibling;
+          if (next) container.insertBefore(next, row);
+        });
+
+        var nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.placeholder = 'Item name';
+        nameInput.value = item ? item.name || '' : '';
+        nameInput.dataset.field = 'name';
+
+        var delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'icon-btn danger';
+        delBtn.textContent = '×';
+        delBtn.title = 'Delete item';
+        delBtn.addEventListener('click', function () {
+          container.removeChild(row);
+        });
+
+        row.appendChild(upBtn);
+        row.appendChild(downBtn);
+        row.appendChild(nameInput);
+        row.appendChild(delBtn);
+        container.appendChild(row);
+      }
+
+      function collectItems() {
+        var rows = document.querySelectorAll('#item-editor-rows .item-editor-row');
+        var items = [];
+        rows.forEach(function (row, idx) {
+          var nameEl = row.querySelector('[data-field="name"]');
+          var name = nameEl ? nameEl.value.trim() : '';
+          if (!name) return; // skip blank rows
+          var id = row.dataset.itemId || 'item_' + Date.now() + '_' + idx;
+          items.push({ id: id, name: name, description: '', order: idx });
+        });
+        return items;
+      }
+
+      document.getElementById('add-item-btn').addEventListener('click', function () {
+        // Generate a new unique id for fresh items
+        addItemRow({
+          id: 'item_' + Date.now() + '_' + Math.floor(Math.random() * 10000),
+          name: '',
+        });
+        // Focus the new input
+        var rows = document.querySelectorAll('#item-editor-rows .item-editor-row');
+        if (rows.length) {
+          var last = rows[rows.length - 1];
+          var inp = last.querySelector('[data-field="name"]');
+          if (inp) inp.focus();
+        }
+      });
+
+      // ---------- Inline validation ------------------------------------------
+
+      function validatePayload(payload) {
+        // Items
+        if (!payload.items || payload.items.length === 0) {
+          return 'Items list cannot be empty.';
+        }
+        for (var i = 0; i < payload.items.length; i++) {
+          if (!payload.items[i].name) return 'Item #' + (i + 1) + ' has no name.';
+        }
+
+        // Buckets (MoSCoW only)
+        if (payload.mode !== 'topn') {
+          if (!payload.buckets || payload.buckets.length === 0) {
+            return 'Add at least one bucket.';
+          }
+          for (var j = 0; j < payload.buckets.length; j++) {
+            var b = payload.buckets[j];
+            if (!b.label) return 'Bucket #' + (j + 1) + ' has no label.';
+            if (b.weight < 0) return 'Bucket "' + b.label + '" weight must be 0 or greater.';
+            if (!b.cap || b.cap < 1) return 'Bucket "' + b.label + '" cap must be 1 or greater.';
+          }
+          // Cap sum must equal item count exactly — no unlimited shortcut.
+          var capSum = payload.buckets.reduce(function (s, b) {
+            return s + (b.cap || 0);
+          }, 0);
+          if (capSum !== payload.items.length) {
+            return (
+              'Bucket caps must sum to the number of items (' +
+              payload.items.length +
+              '). Current sum: ' +
+              capSum +
+              '.'
+            );
+          }
+        } else {
+          // Top-N
+          var n = payload.buckets && payload.buckets[0] && payload.buckets[0].cap;
+          if (!(n >= 1 && n <= payload.items.length)) {
+            return (
+              'Top-N cap must be between 1 and the number of items (' + payload.items.length + ').'
+            );
+          }
+        }
+        return null; // valid
+      }
+
+      // ---------- Save -------------------------------------------------------
+
+      document.getElementById('save-btn').addEventListener('click', function () {
+        var modeEl = document.querySelector('input[name="mode"]:checked');
+        var mode = modeEl ? modeEl.value : 'moscow';
+
+        var buckets = collectBuckets();
+        var items = collectItems();
+
+        var rvEl = document.querySelector('input[name="results_visibility"]:checked');
+        var rv = rvEl ? rvEl.value : 'always';
+
+        var adminRaw = document.getElementById('cfg-admin-emails').value;
+        var adminEmails = adminRaw
+          .split(/[\n,\s]+/)
+          .map(function (s) {
+            return s.trim().toLowerCase();
+          })
+          .filter(function (s) {
+            return s.length > 0;
+          });
+
+        var payload = {
+          title: document.getElementById('cfg-title').value,
+          subtitle: document.getElementById('cfg-subtitle').value,
+          blurb: document.getElementById('cfg-blurb').value,
+          mode: mode,
+          buckets: buckets,
+          items: items,
+          resultsVisibility: rv,
+          anonymous: document.getElementById('cfg-anonymous').checked,
+          adminEmails: adminEmails,
+        };
+
+        // Client-side validation before hitting the server
+        var validationError = validatePayload(payload);
+        if (validationError) {
+          showSaveNotice(validationError, 'error');
           return;
         }
-        var labelEl  = row.querySelector('[data-field="label"]');
-        var weightEl = row.querySelector('[data-field="weight"]');
-        var capEl    = row.querySelector('[data-field="cap"]');
-        var label  = labelEl  ? labelEl.value.trim()           : def.label;
-        var weight = weightEl ? parseInt(weightEl.value, 10)   : def.weight;
-        var cap    = capEl    ? parseInt(capEl.value,    10)   : def.cap;
-        if (isNaN(weight)) weight = def.weight;
-        if (isNaN(cap))    cap    = def.cap;
-        buckets.push({ id: def.id, label: label, weight: weight, cap: cap });
+
+        var modeChanging = mode !== currentMode;
+        if (modeChanging) {
+          var subCount = (boot && boot.stats && boot.stats.submissionCount) || 0;
+          var msg =
+            subCount > 0
+              ? 'Switching mode will permanently delete ' +
+                subCount +
+                ' existing submission' +
+                (subCount === 1 ? '' : 's') +
+                '. Continue?'
+              : 'Switching mode will clear all existing submissions. Continue?';
+          if (!confirm(msg)) return;
+          payload.confirmSubmissionsWipe = true;
+        }
+
+        // Detect items-set change (additions/deletions only; renames and reorders don't count).
+        var bootItemIds = new Set(
+          ((boot && boot.config && boot.config.items) || []).map(function (i) {
+            return i.id;
+          })
+        );
+        var newItemIds = new Set(
+          items.map(function (i) {
+            return i.id;
+          })
+        );
+        var itemsChanging = bootItemIds.size !== newItemIds.size;
+        if (!itemsChanging) {
+          bootItemIds.forEach(function (id) {
+            if (!newItemIds.has(id)) itemsChanging = true;
+          });
+        }
+        if (itemsChanging) {
+          var iSubCount = (boot && boot.stats && boot.stats.submissionCount) || 0;
+          if (iSubCount > 0) {
+            var iMsg =
+              'Changing items will clear all ' +
+              iSubCount +
+              ' existing submission' +
+              (iSubCount === 1 ? '' : 's') +
+              '. Continue?';
+            if (!confirm(iMsg)) return;
+            payload.confirmItemsChangeWipe = true;
+          }
+        }
+
+        var btn = document.getElementById('save-btn');
+        btn.disabled = true;
+
+        google.script.run
+          .withSuccessHandler(function () {
+            onSaved();
+          })
+          .withFailureHandler(onSaveError)
+          .saveConfig(payload);
       });
-      return buckets;
-    }
 
-    // ---------- Item editor ------------------------------------------------
-
-    function populateItems(items) {
-      var container = document.getElementById('item-editor-rows');
-      container.innerHTML = '';
-      (items || []).forEach(function(item) {
-        addItemRow(item);
-      });
-    }
-
-    function addItemRow(item) {
-      var container = document.getElementById('item-editor-rows');
-      var row = document.createElement('div');
-      row.className = 'item-editor-row';
-      // Store the stable id as a data attribute so renames preserve it
-      row.dataset.itemId = item ? (item.id || '') : '';
-
-      var upBtn = document.createElement('button');
-      upBtn.type = 'button';
-      upBtn.className = 'icon-btn';
-      upBtn.textContent = '↑';
-      upBtn.title = 'Move up';
-      upBtn.addEventListener('click', function() {
-        var prev = row.previousElementSibling;
-        if (prev) container.insertBefore(row, prev);
-      });
-
-      var downBtn = document.createElement('button');
-      downBtn.type = 'button';
-      downBtn.className = 'icon-btn';
-      downBtn.textContent = '↓';
-      downBtn.title = 'Move down';
-      downBtn.addEventListener('click', function() {
-        var next = row.nextElementSibling;
-        if (next) container.insertBefore(next, row);
-      });
-
-      var nameInput = document.createElement('input');
-      nameInput.type = 'text';
-      nameInput.placeholder = 'Item name';
-      nameInput.value = item ? (item.name || '') : '';
-      nameInput.dataset.field = 'name';
-
-      var delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.className = 'icon-btn danger';
-      delBtn.textContent = '×';
-      delBtn.title = 'Delete item';
-      delBtn.addEventListener('click', function() { container.removeChild(row); });
-
-      row.appendChild(upBtn);
-      row.appendChild(downBtn);
-      row.appendChild(nameInput);
-      row.appendChild(delBtn);
-      container.appendChild(row);
-    }
-
-    function collectItems() {
-      var rows = document.querySelectorAll('#item-editor-rows .item-editor-row');
-      var items = [];
-      rows.forEach(function(row, idx) {
-        var nameEl = row.querySelector('[data-field="name"]');
-        var name = nameEl ? nameEl.value.trim() : '';
-        if (!name) return; // skip blank rows
-        var id = row.dataset.itemId || ('item_' + Date.now() + '_' + idx);
-        items.push({ id: id, name: name, description: '', order: idx });
-      });
-      return items;
-    }
-
-    document.getElementById('add-item-btn').addEventListener('click', function() {
-      // Generate a new unique id for fresh items
-      addItemRow({ id: 'item_' + Date.now() + '_' + Math.floor(Math.random() * 10000), name: '' });
-      // Focus the new input
-      var rows = document.querySelectorAll('#item-editor-rows .item-editor-row');
-      if (rows.length) {
-        var last = rows[rows.length - 1];
-        var inp = last.querySelector('[data-field="name"]');
-        if (inp) inp.focus();
-      }
-    });
-
-    // ---------- Inline validation ------------------------------------------
-
-    function validatePayload(payload) {
-      // Items
-      if (!payload.items || payload.items.length === 0) {
-        return 'Items list cannot be empty.';
-      }
-      for (var i = 0; i < payload.items.length; i++) {
-        if (!payload.items[i].name) return 'Item #' + (i + 1) + ' has no name.';
+      function onSaved() {
+        document.getElementById('save-btn').disabled = false;
+        showSaveNotice('Saved.', 'success');
+        refreshAdminBoot();
       }
 
-      // Buckets (MoSCoW only)
-      if (payload.mode !== 'topn') {
-        if (!payload.buckets || payload.buckets.length === 0) {
-          return 'Add at least one bucket.';
-        }
-        for (var j = 0; j < payload.buckets.length; j++) {
-          var b = payload.buckets[j];
-          if (!b.label) return 'Bucket #' + (j + 1) + ' has no label.';
-          if (b.weight < 0) return 'Bucket "' + b.label + '" weight must be 0 or greater.';
-          if (!b.cap || b.cap < 1) return 'Bucket "' + b.label + '" cap must be 1 or greater.';
-        }
-        // Cap sum must equal item count exactly — no unlimited shortcut.
-        var capSum = payload.buckets.reduce(function(s, b) { return s + (b.cap || 0); }, 0);
-        if (capSum !== payload.items.length) {
-          return 'Bucket caps must sum to the number of items (' + payload.items.length + '). Current sum: ' + capSum + '.';
-        }
-      } else {
-        // Top-N
-        var n = payload.buckets && payload.buckets[0] && payload.buckets[0].cap;
-        if (!(n >= 1 && n <= payload.items.length)) {
-          return 'Top-N cap must be between 1 and the number of items (' + payload.items.length + ').';
+      function onSaveError(err) {
+        document.getElementById('save-btn').disabled = false;
+        showSaveNotice((err && err.message) || 'Save failed.', 'error');
+      }
+
+      function refreshAdminBoot() {
+        google.script.run
+          .withSuccessHandler(function (data) {
+            boot = data;
+            currentMode = (data.config && data.config.mode) || 'moscow';
+            document.getElementById('page-title').textContent =
+              'Admin · ' + (data.config.title || 'Prioritize');
+            document.getElementById('stat-submissions').textContent = data.stats.submissionCount;
+            document.getElementById('stat-items').textContent = data.stats.itemCount;
+            populateForm(data.config);
+            populateItems(data.config.items || []);
+            loadResults();
+          })
+          .withFailureHandler(function () {
+            loadResults();
+          })
+          .getAdminBoot();
+      }
+
+      function showSaveNotice(msg, type) {
+        var el = document.getElementById('save-notice');
+        el.className = 'notice ' + (type || '');
+        el.textContent = msg;
+        el.classList.remove('hidden');
+        if (type === 'success') {
+          setTimeout(function () {
+            el.classList.add('hidden');
+          }, 3000);
         }
       }
-      return null; // valid
-    }
 
-    // ---------- Save -------------------------------------------------------
+      // ---------- Reset all rankings -----------------------------------------
 
-    document.getElementById('save-btn').addEventListener('click', function() {
-      var modeEl = document.querySelector('input[name="mode"]:checked');
-      var mode = modeEl ? modeEl.value : 'moscow';
-
-      var buckets = collectBuckets();
-      var items   = collectItems();
-
-      var rvEl = document.querySelector('input[name="results_visibility"]:checked');
-      var rv = rvEl ? rvEl.value : 'always';
-
-      var adminRaw = document.getElementById('cfg-admin-emails').value;
-      var adminEmails = adminRaw
-        .split(/[\n,\s]+/)
-        .map(function(s) { return s.trim().toLowerCase(); })
-        .filter(function(s) { return s.length > 0; });
-
-      var payload = {
-        title:             document.getElementById('cfg-title').value,
-        subtitle:          document.getElementById('cfg-subtitle').value,
-        blurb:             document.getElementById('cfg-blurb').value,
-        mode:              mode,
-        buckets:           buckets,
-        items:             items,
-        resultsVisibility: rv,
-        anonymous:         document.getElementById('cfg-anonymous').checked,
-        adminEmails:       adminEmails,
-      };
-
-      // Client-side validation before hitting the server
-      var validationError = validatePayload(payload);
-      if (validationError) {
-        showSaveNotice(validationError, 'error');
-        return;
-      }
-
-      var modeChanging = mode !== currentMode;
-      if (modeChanging) {
+      document.getElementById('reset-all-btn').addEventListener('click', function () {
         var subCount = (boot && boot.stats && boot.stats.submissionCount) || 0;
-        var msg = subCount > 0
-          ? 'Switching mode will permanently delete ' + subCount + ' existing submission' + (subCount === 1 ? '' : 's') + '. Continue?'
-          : 'Switching mode will clear all existing submissions. Continue?';
-        if (!confirm(msg)) return;
-        payload.confirmSubmissionsWipe = true;
+        var msg1 =
+          'This will permanently delete all ' +
+          subCount +
+          ' submission' +
+          (subCount === 1 ? '' : 's') +
+          '. Continue?';
+        if (!confirm(msg1)) return;
+        if (!confirm('Are you absolutely sure? This cannot be undone.')) return;
+
+        var btn = document.getElementById('reset-all-btn');
+        btn.disabled = true;
+
+        google.script.run
+          .withSuccessHandler(function () {
+            btn.disabled = false;
+            var el = document.getElementById('reset-all-notice');
+            el.className = 'notice success';
+            el.textContent = 'All rankings deleted.';
+            el.classList.remove('hidden');
+            setTimeout(function () {
+              el.classList.add('hidden');
+            }, 3000);
+            refreshAdminBoot();
+          })
+          .withFailureHandler(function (err) {
+            btn.disabled = false;
+            var el = document.getElementById('reset-all-notice');
+            el.className = 'notice error';
+            el.textContent = (err && err.message) || 'Reset failed.';
+            el.classList.remove('hidden');
+          })
+          .deleteAllSubmissions();
+      });
+
+      // ---------- Results ----------------------------------------------------
+
+      function loadResults() {
+        var el = document.getElementById('results-content');
+        el.className = 'loading';
+        el.textContent = 'Loading results\u2026';
+        google.script.run
+          .withSuccessHandler(renderResults)
+          .withFailureHandler(function (err) {
+            el.className = '';
+            el.innerHTML =
+              '<div class="notice error">' +
+              escapeHtml((err && err.message) || 'Failed to load results.') +
+              '</div>';
+          })
+          .getResults();
       }
 
-      // Detect items-set change (additions/deletions only; renames and reorders don't count).
-      var bootItemIds = new Set((boot && boot.config && boot.config.items || []).map(function(i) { return i.id; }));
-      var newItemIds  = new Set(items.map(function(i) { return i.id; }));
-      var itemsChanging = bootItemIds.size !== newItemIds.size;
-      if (!itemsChanging) {
-        bootItemIds.forEach(function(id) { if (!newItemIds.has(id)) itemsChanging = true; });
-      }
-      if (itemsChanging) {
-        var iSubCount = (boot && boot.stats && boot.stats.submissionCount) || 0;
-        if (iSubCount > 0) {
-          var iMsg = 'Changing items will clear all ' + iSubCount + ' existing submission' + (iSubCount === 1 ? '' : 's') + '. Continue?';
-          if (!confirm(iMsg)) return;
-          payload.confirmItemsChangeWipe = true;
+      var BUCKET_LETTER = { must: 'M', should: 'S', could: 'C', wont: 'W', top: 'T' };
+
+      function renderResults(data) {
+        var el = document.getElementById('results-content');
+        el.className = '';
+
+        if (data.gated) {
+          el.innerHTML =
+            '<div class="notice">' + escapeHtml('Results gated: ' + data.gated) + '</div>';
+          return;
         }
-      }
 
-      var btn = document.getElementById('save-btn');
-      btn.disabled = true;
+        if (!data.submissions || data.submissions.length === 0) {
+          el.innerHTML = '<div class="notice">No submissions yet.</div>';
+          return;
+        }
 
-      google.script.run
-        .withSuccessHandler(function() { onSaved(); })
-        .withFailureHandler(onSaveError)
-        .saveConfig(payload);
-    });
+        var cfg = (boot && boot.config) || {};
+        var buckets = cfg.buckets || [];
 
-    function onSaved() {
-      document.getElementById('save-btn').disabled = false;
-      showSaveNotice('Saved.', 'success');
-      refreshAdminBoot();
-    }
+        var voterCount = data.submissions.length;
+        var itemsHtml = data.items
+          .map(function (item, idx) {
+            var chips = item.voters
+              .map(function (v) {
+                var letter = BUCKET_LETTER[v.bucket] || v.bucket;
+                return (
+                  '<span class="voter-chip"><span class="voter-name">' +
+                  escapeHtml(v.voter) +
+                  '</span> <span class="bucket-letter ' +
+                  escapeHtml(v.bucket) +
+                  ' mono">' +
+                  escapeHtml(letter) +
+                  '</span></span>'
+                );
+              })
+              .join('');
+            var stdev = item.stdev
+              ? '<span class="result-meta mono">\u03c3 ' + item.stdev.toFixed(1) + '</span>'
+              : '';
+            var totalVoters = item.voters.length || 1;
+            var distBar = buckets
+              .map(function (b) {
+                var pct = ((item.bucketCounts[b.id] || 0) / totalVoters) * 100;
+                return pct > 0
+                  ? '<div class="dist-segment ' +
+                      escapeHtml(b.id) +
+                      '" style="width:' +
+                      pct +
+                      '%"></div>'
+                  : '';
+              })
+              .join('');
+            return (
+              '<div class="result-row">' +
+              '<div class="result-head">' +
+              '<span class="result-rank mono">' +
+              (idx + 1) +
+              '</span>' +
+              '<span class="result-name">' +
+              escapeHtml(item.name) +
+              '</span>' +
+              '<span class="result-score mono">' +
+              item.score +
+              '</span>' +
+              stdev +
+              '</div>' +
+              '<div class="dist-bar">' +
+              distBar +
+              '</div>' +
+              '<div class="voter-chips">' +
+              (chips || '<span>no votes</span>') +
+              '</div>' +
+              '</div>'
+            );
+          })
+          .join('');
 
-    function onSaveError(err) {
-      document.getElementById('save-btn').disabled = false;
-      showSaveNotice((err && err.message) || 'Save failed.', 'error');
-    }
+        var subs = renderSubmissions(data.submissions, buckets, cfg.items || []);
 
-    function refreshAdminBoot() {
-      google.script.run
-        .withSuccessHandler(function(data) {
-          boot = data;
-          currentMode = (data.config && data.config.mode) || 'moscow';
-          document.getElementById('page-title').textContent = 'Admin · ' + (data.config.title || 'Prioritize');
-          document.getElementById('stat-submissions').textContent = data.stats.submissionCount;
-          document.getElementById('stat-items').textContent = data.stats.itemCount;
-          populateForm(data.config);
-          populateItems(data.config.items || []);
-          loadResults();
-        })
-        .withFailureHandler(function() { loadResults(); })
-        .getAdminBoot();
-    }
-
-    function showSaveNotice(msg, type) {
-      var el = document.getElementById('save-notice');
-      el.className = 'notice ' + (type || '');
-      el.textContent = msg;
-      el.classList.remove('hidden');
-      if (type === 'success') {
-        setTimeout(function() { el.classList.add('hidden'); }, 3000);
-      }
-    }
-
-    // ---------- Reset all rankings -----------------------------------------
-
-    document.getElementById('reset-all-btn').addEventListener('click', function() {
-      var subCount = (boot && boot.stats && boot.stats.submissionCount) || 0;
-      var msg1 = 'This will permanently delete all ' + subCount + ' submission' + (subCount === 1 ? '' : 's') + '. Continue?';
-      if (!confirm(msg1)) return;
-      if (!confirm('Are you absolutely sure? This cannot be undone.')) return;
-
-      var btn = document.getElementById('reset-all-btn');
-      btn.disabled = true;
-
-      google.script.run
-        .withSuccessHandler(function() {
-          btn.disabled = false;
-          var el = document.getElementById('reset-all-notice');
-          el.className = 'notice success';
-          el.textContent = 'All rankings deleted.';
-          el.classList.remove('hidden');
-          setTimeout(function() { el.classList.add('hidden'); }, 3000);
-          refreshAdminBoot();
-        })
-        .withFailureHandler(function(err) {
-          btn.disabled = false;
-          var el = document.getElementById('reset-all-notice');
-          el.className = 'notice error';
-          el.textContent = (err && err.message) || 'Reset failed.';
-          el.classList.remove('hidden');
-        })
-        .deleteAllSubmissions();
-    });
-
-    // ---------- Results ----------------------------------------------------
-
-    function loadResults() {
-      var el = document.getElementById('results-content');
-      el.className = 'loading';
-      el.textContent = 'Loading results\u2026';
-      google.script.run
-        .withSuccessHandler(renderResults)
-        .withFailureHandler(function(err) {
-          el.className = '';
-          el.innerHTML = '<div class="notice error">' + escapeHtml((err && err.message) || 'Failed to load results.') + '</div>';
-        })
-        .getResults();
-    }
-
-    var BUCKET_LETTER = { must: 'M', should: 'S', could: 'C', wont: 'W', top: 'T' };
-
-    function renderResults(data) {
-      var el = document.getElementById('results-content');
-      el.className = '';
-
-      if (data.gated) {
-        el.innerHTML = '<div class="notice">' + escapeHtml('Results gated: ' + data.gated) + '</div>';
-        return;
-      }
-
-      if (!data.submissions || data.submissions.length === 0) {
-        el.innerHTML = '<div class="notice">No submissions yet.</div>';
-        return;
-      }
-
-      var cfg = (boot && boot.config) || {};
-      var buckets = cfg.buckets || [];
-
-      var voterCount = data.submissions.length;
-      var itemsHtml = data.items.map(function(item, idx) {
-        var chips = item.voters.map(function(v) {
-          var letter = BUCKET_LETTER[v.bucket] || v.bucket;
-          return '<span class="voter-chip"><span class="voter-name">' + escapeHtml(v.voter) + '</span> <span class="bucket-letter ' + escapeHtml(v.bucket) + ' mono">' + escapeHtml(letter) + '</span></span>';
-        }).join('');
-        var stdev = item.stdev ? '<span class="result-meta mono">\u03c3 ' + item.stdev.toFixed(1) + '</span>' : '';
-        var totalVoters = item.voters.length || 1;
-        var distBar = buckets.map(function(b) {
-          var pct = ((item.bucketCounts[b.id] || 0) / totalVoters) * 100;
-          return pct > 0 ? '<div class="dist-segment ' + escapeHtml(b.id) + '" style="width:' + pct + '%"></div>' : '';
-        }).join('');
-        return '<div class="result-row">' +
-          '<div class="result-head">' +
-          '<span class="result-rank mono">' + (idx + 1) + '</span>' +
-          '<span class="result-name">' + escapeHtml(item.name) + '</span>' +
-          '<span class="result-score mono">' + item.score + '</span>' +
-          stdev +
+        el.innerHTML =
+          '<div class="section-label">' +
+          voterCount +
+          ' submission' +
+          (voterCount === 1 ? '' : 's') +
           '</div>' +
-          '<div class="dist-bar">' + distBar + '</div>' +
-          '<div class="voter-chips">' + (chips || '<span>no votes</span>') + '</div>' +
-          '</div>';
-      }).join('');
+          itemsHtml +
+          subs;
+      }
 
-      var subs = renderSubmissions(data.submissions, buckets, cfg.items || []);
+      function renderSubmissions(subs, buckets, cfgItems) {
+        var itemById = {};
+        (cfgItems || []).forEach(function (i) {
+          itemById[i.id] = i.name;
+        });
+        var sorted = subs.slice().sort(function (a, b) {
+          return new Date(b.submittedAt) - new Date(a.submittedAt);
+        });
+        var rows = sorted
+          .map(function (s) {
+            var a = s.assignments || {};
+            var groups = buckets
+              .map(function (b) {
+                var names = Object.keys(a)
+                  .filter(function (id) {
+                    return a[id] === b.id;
+                  })
+                  .map(function (id) {
+                    return escapeHtml(itemById[id] || id);
+                  });
+                if (!names.length) return '';
+                return (
+                  '<div class="sub-bucket-group">' +
+                  '<div class="sub-bucket-label">' +
+                  escapeHtml(b.label) +
+                  '</div>' +
+                  '<ul class="sub-bucket-items">' +
+                  names
+                    .map(function (n) {
+                      return '<li>' + n + '</li>';
+                    })
+                    .join('') +
+                  '</ul>' +
+                  '</div>'
+                );
+              })
+              .join('');
+            return (
+              '<div class="submission">' +
+              '<h4>' +
+              escapeHtml(s.displayName || s.email) +
+              ' <span class="result-meta">' +
+              escapeHtml(fmtTime(s.submittedAt)) +
+              '</span></h4>' +
+              groups +
+              '</div>'
+            );
+          })
+          .join('');
 
-      el.innerHTML =
-        '<div class="section-label">' + voterCount + ' submission' + (voterCount === 1 ? '' : 's') + '</div>' +
-        itemsHtml +
-        subs;
-    }
+        return (
+          '<details class="submissions"><summary>Individual submissions (' +
+          subs.length +
+          ')</summary>' +
+          rows +
+          '</details>'
+        );
+      }
 
-    function renderSubmissions(subs, buckets, cfgItems) {
-      var itemById = {};
-      (cfgItems || []).forEach(function(i) { itemById[i.id] = i.name; });
-      var sorted = subs.slice().sort(function(a, b) { return new Date(b.submittedAt) - new Date(a.submittedAt); });
-      var rows = sorted.map(function(s) {
-        var a = s.assignments || {};
-        var groups = buckets.map(function(b) {
-          var names = Object.keys(a)
-            .filter(function(id) { return a[id] === b.id; })
-            .map(function(id) { return escapeHtml(itemById[id] || id); });
-          if (!names.length) return '';
-          return '<div class="sub-bucket-group">' +
-            '<div class="sub-bucket-label">' + escapeHtml(b.label) + '</div>' +
-            '<ul class="sub-bucket-items">' + names.map(function(n) { return '<li>' + n + '</li>'; }).join('') + '</ul>' +
-            '</div>';
-        }).join('');
-        return '<div class="submission">' +
-          '<h4>' + escapeHtml(s.displayName || s.email) + ' <span class="result-meta">' + escapeHtml(fmtTime(s.submittedAt)) + '</span></h4>' +
-          groups +
-          '</div>';
-      }).join('');
+      // ---------- Utilities --------------------------------------------------
 
-      return '<details class="submissions"><summary>Individual submissions (' + subs.length + ')</summary>' + rows + '</details>';
-    }
+      function escapeHtml(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
 
-    // ---------- Utilities --------------------------------------------------
-
-    function escapeHtml(s) {
-      return String(s == null ? '' : s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
-
-    function fmtTime(iso) {
-      if (!iso) return '';
-      var d = new Date(iso);
-      if (isNaN(d)) return '';
-      var now = new Date();
-      var sameDay = d.toDateString() === now.toDateString();
-      if (sameDay) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-      return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' +
-             d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    }
-  </script>
-</body>
+      function fmtTime(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        if (isNaN(d)) return '';
+        var now = new Date();
+        var sameDay = d.toDateString() === now.toDateString();
+        if (sameDay) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        return (
+          d.toLocaleDateString([], { month: 'short', day: 'numeric' }) +
+          ' ' +
+          d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+        );
+      }
+    </script>
+  </body>
 </html>

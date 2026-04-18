@@ -16,21 +16,21 @@
 // ---------- Default seeds (used only on first boot) -----------------------
 
 const DEFAULT_ITEMS = [
-  { id: 'sso',          name: 'Single sign-on (SAML / OIDC)' },
-  { id: 'mobile_app',   name: 'Native mobile apps for iOS and Android' },
-  { id: 'dark_mode',    name: 'Dark mode across all product surfaces' },
-  { id: 'api_v2',       name: 'Public REST API v2 with webhooks' },
-  { id: 'audit_log',    name: 'Audit log and compliance export' },
-  { id: 'bulk_import',  name: 'Bulk import from CSV and third-party tools' },
-  { id: 'chat_ops',     name: 'Slack and Microsoft Teams integrations' },
-  { id: 'ai_assist',    name: 'AI-generated summaries and smart suggestions' },
+  { id: 'sso', name: 'Single sign-on (SAML / OIDC)' },
+  { id: 'mobile_app', name: 'Native mobile apps for iOS and Android' },
+  { id: 'dark_mode', name: 'Dark mode across all product surfaces' },
+  { id: 'api_v2', name: 'Public REST API v2 with webhooks' },
+  { id: 'audit_log', name: 'Audit log and compliance export' },
+  { id: 'bulk_import', name: 'Bulk import from CSV and third-party tools' },
+  { id: 'chat_ops', name: 'Slack and Microsoft Teams integrations' },
+  { id: 'ai_assist', name: 'AI-generated summaries and smart suggestions' },
 ];
 
 const DEFAULT_BUCKETS = [
-  { id: 'must',   label: 'Must have',   weight: 12, cap: 2 },
-  { id: 'should', label: 'Should have', weight: 6,  cap: 2 },
-  { id: 'could',  label: 'Could have',  weight: 2,  cap: 2 },
-  { id: 'wont',   label: "Won't have",  weight: 0,  cap: 2 },
+  { id: 'must', label: 'Must have', weight: 12, cap: 2 },
+  { id: 'should', label: 'Should have', weight: 6, cap: 2 },
+  { id: 'could', label: 'Could have', weight: 2, cap: 2 },
+  { id: 'wont', label: "Won't have", weight: 0, cap: 2 },
 ];
 
 // Override auto-derived display names for emails that don't title-case cleanly.
@@ -41,27 +41,28 @@ const DISPLAY_NAME_OVERRIDES = {
 const HEADERS = ['timestamp', 'email', 'display_name', 'assignments_json'];
 
 const CONFIG_HEADERS = ['key', 'value'];
-const ITEMS_HEADERS  = ['id', 'name', 'description', 'order'];
+const ITEMS_HEADERS = ['id', 'name', 'description', 'order'];
 
-const DEFAULT_BLURB = 'Rank these items into buckets to see where the group agrees and where it splits. Save anytime — resubmit to update.';
+const DEFAULT_BLURB =
+  'Rank these items into buckets to see where the group agrees and where it splits. Save anytime — resubmit to update.';
 
 const DEFAULT_CONFIG = {
-  title:             'Prioritize',
-  subtitle:          '',
-  blurb:             DEFAULT_BLURB,
-  mode:              'moscow',
-  buckets:           DEFAULT_BUCKETS,
+  title: 'Prioritize',
+  subtitle: '',
+  blurb: DEFAULT_BLURB,
+  mode: 'moscow',
+  buckets: DEFAULT_BUCKETS,
   resultsVisibility: 'always',
-  anonymous:         false,
-  adminEmails:       [],  // resolved at install time to the script owner's email
+  anonymous: false,
+  adminEmails: [], // resolved at install time to the script owner's email
 };
 
 // ---------- Invocation-scoped caches -------------------------------------
 // Apps Script creates a fresh script instance per invocation, so these
 // module-level vars act as request-scoped caches — no cross-invocation leakage.
 
-var _isAdminCache = null;  // null = uncached; true/false = cached result
-var _rowsCache    = null;  // null = uncached; array = cached readAllRows_ result
+var _isAdminCache = null; // null = uncached; true/false = cached result
+var _rowsCache = null; // null = uncached; array = cached readAllRows_ result
 
 // ---------- Installer ----------------------------------------------------
 
@@ -71,26 +72,26 @@ var _rowsCache    = null;  // null = uncached; array = cached readAllRows_ resul
 function seedConfigRowsIfMissing_(sheet, adminEmail) {
   const effectiveAdminEmail = adminEmail || '';
   const defaultConfigRows = [
-    ['title',              DEFAULT_CONFIG.title],
-    ['subtitle',           DEFAULT_CONFIG.subtitle],
-    ['blurb',              DEFAULT_CONFIG.blurb],
-    ['mode',               DEFAULT_CONFIG.mode],
-    ['buckets_json',       JSON.stringify(DEFAULT_CONFIG.buckets)],
+    ['title', DEFAULT_CONFIG.title],
+    ['subtitle', DEFAULT_CONFIG.subtitle],
+    ['blurb', DEFAULT_CONFIG.blurb],
+    ['mode', DEFAULT_CONFIG.mode],
+    ['buckets_json', JSON.stringify(DEFAULT_CONFIG.buckets)],
     ['results_visibility', DEFAULT_CONFIG.resultsVisibility],
-    ['anonymous',          String(DEFAULT_CONFIG.anonymous)],
-    ['admin_emails',       effectiveAdminEmail],
+    ['anonymous', String(DEFAULT_CONFIG.anonymous)],
+    ['admin_emails', effectiveAdminEmail],
   ];
 
   const lastRow = sheet.getLastRow();
   const existingKeys = {};
   if (lastRow >= 2) {
     const existing = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
-    existing.forEach(function(row) {
+    existing.forEach(function (row) {
       if (row[0]) existingKeys[String(row[0])] = true;
     });
   }
 
-  defaultConfigRows.forEach(function(pair) {
+  defaultConfigRows.forEach(function (pair) {
     if (!existingKeys[pair[0]]) {
       sheet.appendRow(pair);
     }
@@ -123,7 +124,9 @@ function ensureInstalled_() {
     adminEmail = '';
   }
   if (!adminEmail) {
-    console.warn('ensureInstalled_: getEffectiveUser() returned empty — seeding admin_emails as empty. Add an admin email manually via the Config sheet.');
+    console.warn(
+      'ensureInstalled_: getEffectiveUser() returned empty — seeding admin_emails as empty. Add an admin email manually via the Config sheet.'
+    );
   }
 
   seedConfigRowsIfMissing_(configSheet, adminEmail);
@@ -144,7 +147,7 @@ function ensureInstalled_() {
   const lastItemRow = itemsSheet.getLastRow();
   const freshItems = lastItemRow < 2;
   if (freshItems) {
-    DEFAULT_ITEMS.forEach(function(item, index) {
+    DEFAULT_ITEMS.forEach(function (item, index) {
       itemsSheet.appendRow([item.id, item.name, '', index]);
     });
   }
@@ -166,12 +169,64 @@ function ensureInstalled_() {
   if (freshItems && subSheet.getLastRow() < 2) {
     const now = new Date();
     const exampleSubmissions = [
-      ['alice@example.com',  'Alice',  { sso: 'must', mobile_app: 'must', dark_mode: 'should', api_v2: 'should', audit_log: 'could', bulk_import: 'could', chat_ops: 'wont', ai_assist: 'wont' }],
-      ['bob@example.com',    'Bob',    { sso: 'must', api_v2: 'must', audit_log: 'should', chat_ops: 'should', mobile_app: 'could', bulk_import: 'could', dark_mode: 'wont', ai_assist: 'wont' }],
-      ['carol@example.com',  'Carol',  { api_v2: 'must', audit_log: 'must', sso: 'should', ai_assist: 'should', chat_ops: 'could', bulk_import: 'could', mobile_app: 'wont', dark_mode: 'wont' }],
-      ['dave@example.com',   'Dave',   { sso: 'must', chat_ops: 'must', api_v2: 'should', ai_assist: 'should', audit_log: 'could', mobile_app: 'could', bulk_import: 'wont', dark_mode: 'wont' }],
+      [
+        'alice@example.com',
+        'Alice',
+        {
+          sso: 'must',
+          mobile_app: 'must',
+          dark_mode: 'should',
+          api_v2: 'should',
+          audit_log: 'could',
+          bulk_import: 'could',
+          chat_ops: 'wont',
+          ai_assist: 'wont',
+        },
+      ],
+      [
+        'bob@example.com',
+        'Bob',
+        {
+          sso: 'must',
+          api_v2: 'must',
+          audit_log: 'should',
+          chat_ops: 'should',
+          mobile_app: 'could',
+          bulk_import: 'could',
+          dark_mode: 'wont',
+          ai_assist: 'wont',
+        },
+      ],
+      [
+        'carol@example.com',
+        'Carol',
+        {
+          api_v2: 'must',
+          audit_log: 'must',
+          sso: 'should',
+          ai_assist: 'should',
+          chat_ops: 'could',
+          bulk_import: 'could',
+          mobile_app: 'wont',
+          dark_mode: 'wont',
+        },
+      ],
+      [
+        'dave@example.com',
+        'Dave',
+        {
+          sso: 'must',
+          chat_ops: 'must',
+          api_v2: 'should',
+          ai_assist: 'should',
+          audit_log: 'could',
+          mobile_app: 'could',
+          bulk_import: 'wont',
+          dark_mode: 'wont',
+        },
+      ],
     ];
-    exampleSubmissions.forEach(function(row) {
+    exampleSubmissions.forEach(function (row) {
       subSheet.appendRow([now, row[0], row[1], JSON.stringify(row[2])]);
     });
   }
@@ -185,9 +240,14 @@ function isAdmin_() {
   if (_isAdminCache !== null) return _isAdminCache;
   try {
     const me = normalizeEmail_(Session.getActiveUser().getEmail());
-    if (!me) { _isAdminCache = false; return false; }
+    if (!me) {
+      _isAdminCache = false;
+      return false;
+    }
     const cfg = getConfig_();
-    const admins = (cfg.adminEmails || []).map(function(e) { return String(e).trim().toLowerCase(); });
+    const admins = (cfg.adminEmails || []).map(function (e) {
+      return String(e).trim().toLowerCase();
+    });
     _isAdminCache = admins.indexOf(me) !== -1;
     return _isAdminCache;
   } catch (e) {
@@ -218,7 +278,9 @@ function doGet(e) {
 
 function getCurrentUser_() {
   const raw = Session.getActiveUser().getEmail();
-  const email = String(raw || '').trim().toLowerCase();
+  const email = String(raw || '')
+    .trim()
+    .toLowerCase();
   if (!email) {
     throw new Error(
       'Unable to determine your identity. Please open this URL while signed in to your Google account.'
@@ -273,13 +335,17 @@ function getItemsSheet_() {
 
 function getSheetUrl() {
   const id = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-  const url = id ? `https://docs.google.com/spreadsheets/d/${id}` : 'Sheet not created yet — open the web app URL first to trigger sheet creation.';
+  const url = id
+    ? `https://docs.google.com/spreadsheets/d/${id}`
+    : 'Sheet not created yet — open the web app URL first to trigger sheet creation.';
   console.log(url);
   return url;
 }
 
 function normalizeEmail_(email) {
-  return String(email || '').trim().toLowerCase();
+  return String(email || '')
+    .trim()
+    .toLowerCase();
 }
 
 function readAllRows_() {
@@ -305,7 +371,7 @@ function safeParse_(cell) {
   if (!cell) return null;
   try {
     const parsed = JSON.parse(cell);
-    return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : null;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
   } catch (e) {
     return null;
   }
@@ -322,7 +388,7 @@ function getConfig_() {
 
   const rows = sheet.getRange(2, 1, last - 1, 2).getValues();
   const map = {};
-  rows.forEach(function(row) {
+  rows.forEach(function (row) {
     if (row[0]) map[String(row[0])] = row[1];
   });
 
@@ -339,26 +405,33 @@ function getConfig_() {
   if (map['admin_emails']) {
     adminEmails = String(map['admin_emails'])
       .split(/[\s,]+/)
-      .map(function(s) { return s.trim().toLowerCase(); })
-      .filter(function(s) { return s.length > 0; });
+      .map(function (s) {
+        return s.trim().toLowerCase();
+      })
+      .filter(function (s) {
+        return s.length > 0;
+      });
   }
 
   var anonRaw = map['anonymous'];
   var anonymous = false;
   if (anonRaw !== undefined && anonRaw !== null && anonRaw !== '') {
     var anonStr = String(anonRaw).trim().toLowerCase();
-    anonymous = (anonStr === 'true' || anonStr === '1');
+    anonymous = anonStr === 'true' || anonStr === '1';
   }
 
   return {
-    title:             map['title']              !== undefined ? String(map['title'])              : defaults.title,
-    subtitle:          map['subtitle']           !== undefined ? String(map['subtitle'])           : defaults.subtitle,
-    blurb:             map['blurb']              !== undefined ? String(map['blurb'])              : defaults.blurb,
-    mode:              map['mode']               !== undefined ? String(map['mode'])               : defaults.mode,
-    buckets:           buckets,
-    resultsVisibility: map['results_visibility'] !== undefined ? String(map['results_visibility']) : defaults.resultsVisibility,
-    anonymous:         anonymous,
-    adminEmails:       adminEmails,
+    title: map['title'] !== undefined ? String(map['title']) : defaults.title,
+    subtitle: map['subtitle'] !== undefined ? String(map['subtitle']) : defaults.subtitle,
+    blurb: map['blurb'] !== undefined ? String(map['blurb']) : defaults.blurb,
+    mode: map['mode'] !== undefined ? String(map['mode']) : defaults.mode,
+    buckets: buckets,
+    resultsVisibility:
+      map['results_visibility'] !== undefined
+        ? String(map['results_visibility'])
+        : defaults.resultsVisibility,
+    anonymous: anonymous,
+    adminEmails: adminEmails,
   };
 }
 
@@ -368,16 +441,20 @@ function getItemsFromSheet_() {
   if (last < 2) return [];
   const rows = sheet.getRange(2, 1, last - 1, ITEMS_HEADERS.length).getValues();
   const items = rows
-    .filter(function(row) { return row[0] && String(row[0]).trim() !== ''; })
-    .map(function(row) {
+    .filter(function (row) {
+      return row[0] && String(row[0]).trim() !== '';
+    })
+    .map(function (row) {
       return {
-        id:          String(row[0]).trim(),
-        name:        String(row[1] || '').trim(),
+        id: String(row[0]).trim(),
+        name: String(row[1] || '').trim(),
         description: String(row[2] || '').trim(),
-        order:       Number(row[3]) || 0,
+        order: Number(row[3]) || 0,
       };
     });
-  items.sort(function(a, b) { return a.order - b.order; });
+  items.sort(function (a, b) {
+    return a.order - b.order;
+  });
   return items;
 }
 
@@ -404,23 +481,29 @@ function saveConfig(payload) {
     const buckets = payload.buckets;
     for (const b of buckets) {
       if (!b.cap || Number(b.cap) < 1) {
-        throw new Error(
-          'Bucket "' + (b.label || b.id) + '" cap must be 1 or greater.'
-        );
+        throw new Error('Bucket "' + (b.label || b.id) + '" cap must be 1 or greater.');
       }
     }
-    const capSum = buckets.reduce(function(s, b) { return s + Number(b.cap); }, 0);
+    const capSum = buckets.reduce(function (s, b) {
+      return s + Number(b.cap);
+    }, 0);
     if (capSum !== effectiveItems.length) {
       throw new Error(
-        'Bucket caps must sum to the number of items (' + effectiveItems.length + '). ' +
-        'Current sum: ' + capSum + '. Adjust caps before saving.'
+        'Bucket caps must sum to the number of items (' +
+          effectiveItems.length +
+          '). ' +
+          'Current sum: ' +
+          capSum +
+          '. Adjust caps before saving.'
       );
     }
   }
 
   // --- Top-N cap validation ---
   if (payload.buckets !== undefined && newModeForValidation === 'topn') {
-    const topBucket = payload.buckets.find(function(b) { return b.id === 'top'; });
+    const topBucket = payload.buckets.find(function (b) {
+      return b.id === 'top';
+    });
     if (topBucket) {
       if (!(topBucket.cap >= 1 && topBucket.cap <= effectiveItems.length)) {
         throw new Error(
@@ -444,13 +527,26 @@ function saveConfig(payload) {
     let itemsChanging = false;
     if (payload.items !== undefined) {
       const currentItems = getItemsFromSheet_();
-      const currentIds = new Set(currentItems.map(function(i) { return i.id; }));
-      const newIds = new Set(payload.items.map(function(i) { return String(i.id || '').trim(); }).filter(Boolean));
+      const currentIds = new Set(
+        currentItems.map(function (i) {
+          return i.id;
+        })
+      );
+      const newIds = new Set(
+        payload.items
+          .map(function (i) {
+            return String(i.id || '').trim();
+          })
+          .filter(Boolean)
+      );
       if (currentIds.size !== newIds.size) {
         itemsChanging = true;
       } else {
         for (const id of currentIds) {
-          if (!newIds.has(id)) { itemsChanging = true; break; }
+          if (!newIds.has(id)) {
+            itemsChanging = true;
+            break;
+          }
         }
       }
     }
@@ -492,16 +588,20 @@ function saveConfig(payload) {
     }
 
     const updates = {};
-    if (payload.title       !== undefined) updates['title']              = String(payload.title);
-    if (payload.subtitle    !== undefined) updates['subtitle']           = String(payload.subtitle);
-    if (payload.blurb       !== undefined) updates['blurb']              = String(payload.blurb);
-    if (payload.mode        !== undefined) updates['mode']               = String(payload.mode);
-    if (bucketsToSave       !== undefined) updates['buckets_json']       = JSON.stringify(bucketsToSave);
-    if (payload.resultsVisibility !== undefined) updates['results_visibility'] = String(payload.resultsVisibility);
-    if (payload.anonymous   !== undefined) updates['anonymous']          = String(!!payload.anonymous);
-    if (payload.adminEmails !== undefined) updates['admin_emails']       = Array.isArray(payload.adminEmails) ? payload.adminEmails.join('\n') : String(payload.adminEmails);
+    if (payload.title !== undefined) updates['title'] = String(payload.title);
+    if (payload.subtitle !== undefined) updates['subtitle'] = String(payload.subtitle);
+    if (payload.blurb !== undefined) updates['blurb'] = String(payload.blurb);
+    if (payload.mode !== undefined) updates['mode'] = String(payload.mode);
+    if (bucketsToSave !== undefined) updates['buckets_json'] = JSON.stringify(bucketsToSave);
+    if (payload.resultsVisibility !== undefined)
+      updates['results_visibility'] = String(payload.resultsVisibility);
+    if (payload.anonymous !== undefined) updates['anonymous'] = String(!!payload.anonymous);
+    if (payload.adminEmails !== undefined)
+      updates['admin_emails'] = Array.isArray(payload.adminEmails)
+        ? payload.adminEmails.join('\n')
+        : String(payload.adminEmails);
 
-    rows.forEach(function(row, i) {
+    rows.forEach(function (row, i) {
       const key = String(row[0]);
       if (updates[key] !== undefined) {
         sheet.getRange(i + 2, 2).setValue(updates[key]);
@@ -515,7 +615,7 @@ function saveConfig(payload) {
       if (lastItem >= 2) {
         itemsSheet.deleteRows(2, lastItem - 1);
       }
-      const itemRows = payload.items.map(function(item, index) {
+      const itemRows = payload.items.map(function (item, index) {
         return [
           String(item.id || '').trim(),
           String(item.name || '').trim(),
@@ -542,24 +642,37 @@ function validateAssignments_(assignments) {
     throw new Error('assignments must be an object');
   }
   const cfg = getConfig_();
-  const items   = getItemsFromSheet_();
+  const items = getItemsFromSheet_();
   const buckets = cfg.buckets;
-  const mode    = cfg.mode;
+  const mode = cfg.mode;
 
-  const validItemIds   = new Set(items.map(function(i) { return i.id; }));
-  const validBucketIds = new Set(buckets.map(function(b) { return b.id; }));
+  const validItemIds = new Set(
+    items.map(function (i) {
+      return i.id;
+    })
+  );
+  const validBucketIds = new Set(
+    buckets.map(function (b) {
+      return b.id;
+    })
+  );
   const gotKeys = Object.keys(assignments);
 
   for (const key of gotKeys) {
     if (!validItemIds.has(key)) throw new Error(`Unknown item id: ${key}`);
-    if (!validBucketIds.has(assignments[key])) throw new Error(`Unknown bucket id: ${assignments[key]}`);
+    if (!validBucketIds.has(assignments[key]))
+      throw new Error(`Unknown bucket id: ${assignments[key]}`);
   }
 
   if (mode === 'topn') {
     // Top-N: only the 'top' bucket is used; unassigned items are the implicit rest.
-    const topBucket = buckets.find(function(b) { return b.id === 'top'; });
+    const topBucket = buckets.find(function (b) {
+      return b.id === 'top';
+    });
     if (!topBucket) throw new Error('Top-N config is missing a "top" bucket');
-    const topCount = gotKeys.filter(function(k) { return assignments[k] === 'top'; }).length;
+    const topCount = gotKeys.filter(function (k) {
+      return assignments[k] === 'top';
+    }).length;
     if (topCount !== topBucket.cap) {
       throw new Error(`Top must contain exactly ${topBucket.cap} items (has ${topCount})`);
     }
@@ -572,12 +685,16 @@ function validateAssignments_(assignments) {
   }
 
   const counts = {};
-  buckets.forEach(function(b) { counts[b.id] = 0; });
+  buckets.forEach(function (b) {
+    counts[b.id] = 0;
+  });
   for (const bucketId of Object.values(assignments)) counts[bucketId]++;
 
   for (const bucket of buckets) {
     if (counts[bucket.id] !== bucket.cap) {
-      throw new Error(`${bucket.label} must contain exactly ${bucket.cap} items (has ${counts[bucket.id]})`);
+      throw new Error(
+        `${bucket.label} must contain exactly ${bucket.cap} items (has ${counts[bucket.id]})`
+      );
     }
   }
 }
@@ -595,14 +712,14 @@ function getBoot() {
   const items = getItemsFromSheet_();
   return {
     config: {
-      items:             items,
-      buckets:           cfg.buckets,
-      title:             cfg.title,
-      subtitle:          cfg.subtitle,
-      blurb:             cfg.blurb,
-      mode:              cfg.mode,
+      items: items,
+      buckets: cfg.buckets,
+      title: cfg.title,
+      subtitle: cfg.subtitle,
+      blurb: cfg.blurb,
+      mode: cfg.mode,
       resultsVisibility: cfg.resultsVisibility,
-      anonymous:         cfg.anonymous,
+      anonymous: cfg.anonymous,
     },
     me: me,
     mySubmission: findSubmissionByEmail_(me.email),
@@ -751,19 +868,19 @@ function getAdminBoot() {
   const me = getCurrentUser_();
   return {
     config: {
-      title:             cfg.title,
-      subtitle:          cfg.subtitle,
-      blurb:             cfg.blurb,
-      mode:              cfg.mode,
-      buckets:           cfg.buckets,
+      title: cfg.title,
+      subtitle: cfg.subtitle,
+      blurb: cfg.blurb,
+      mode: cfg.mode,
+      buckets: cfg.buckets,
       resultsVisibility: cfg.resultsVisibility,
-      anonymous:         cfg.anonymous,
-      adminEmails:       cfg.adminEmails,
-      items:             items,
+      anonymous: cfg.anonymous,
+      adminEmails: cfg.adminEmails,
+      items: items,
     },
     stats: {
       submissionCount: rows.length,
-      itemCount:       items.length,
+      itemCount: items.length,
     },
     sheetUrl: getSheetUrl(),
     me: me,
@@ -774,17 +891,21 @@ function getAdminBoot() {
 // Reads runtime items/buckets from config to avoid hardcoded references.
 function aggregate_(rows) {
   const cfg = getConfig_();
-  const items   = getItemsFromSheet_();
+  const items = getItemsFromSheet_();
   const buckets = cfg.buckets;
 
   const bucketWeightMap = {};
-  buckets.forEach(function(b) { bucketWeightMap[b.id] = b.weight; });
+  buckets.forEach(function (b) {
+    bucketWeightMap[b.id] = b.weight;
+  });
 
   const bucketCountsTemplate = {};
-  buckets.forEach(function(b) { bucketCountsTemplate[b.id] = 0; });
+  buckets.forEach(function (b) {
+    bucketCountsTemplate[b.id] = 0;
+  });
 
   const itemMap = {};
-  items.forEach(function(item) {
+  items.forEach(function (item) {
     itemMap[item.id] = {
       id: item.id,
       name: item.name,
@@ -798,7 +919,7 @@ function aggregate_(rows) {
   rows.forEach((row) => {
     const a = row.assignments;
     if (!a || typeof a !== 'object') return;
-    items.forEach(function(item) {
+    items.forEach(function (item) {
       const bucketId = a[item.id];
       if (!bucketId || bucketWeightMap[bucketId] === undefined) return;
       const entry = itemMap[item.id];
@@ -819,7 +940,7 @@ function aggregate_(rows) {
     stdev: stdev_(entry.weights),
   }));
 
-  list.sort((a, b) => (b.score - a.score) || (a.stdev - b.stdev));
+  list.sort((a, b) => b.score - a.score || a.stdev - b.stdev);
   return list;
 }
 

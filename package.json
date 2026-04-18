@@ -26,6 +26,7 @@
     "prettier": "3.8.3"
   },
   "lint-staged": {
+    "src/**/*.{html,gs}": "prettier --write",
     "scripts/**/*.mjs": "prettier --write"
   }
 }
