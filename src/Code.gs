@@ -303,22 +303,36 @@ function deriveDisplayName_(email) {
 
 function getWorkbook_() {
   const props = PropertiesService.getScriptProperties();
-  let id = props.getProperty('SHEET_ID');
-  let ss;
-  if (id) {
+  const tryOpen = (id) => {
     try {
-      ss = SpreadsheetApp.openById(id);
+      return SpreadsheetApp.openById(id);
     } catch (err) {
-      // Sheet was deleted or inaccessible — recreate.
-      id = null;
+      return null;
     }
+  };
+  const existingId = props.getProperty('SHEET_ID');
+  if (existingId) {
+    const ss = tryOpen(existingId);
+    if (ss) return ss;
   }
-  if (!id) {
+  // First run (or sheet was deleted). Serialize creation so parallel requests
+  // from the initial page load don't each spawn their own workbook.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const reId = props.getProperty('SHEET_ID');
+    if (reId) {
+      const ss = tryOpen(reId);
+      if (ss) return ss;
+    }
     const projectName = DriveApp.getFileById(ScriptApp.getScriptId()).getName();
-    ss = SpreadsheetApp.create(projectName);
-    props.setProperty('SHEET_ID', ss.getId());
+    const sheetName = /prioritize/i.test(projectName) ? projectName : `Prioritize — ${projectName}`;
+    const created = SpreadsheetApp.create(sheetName);
+    props.setProperty('SHEET_ID', created.getId());
+    return created;
+  } finally {
+    lock.releaseLock();
   }
-  return ss;
 }
 
 function getSubmissionsSheet_() {

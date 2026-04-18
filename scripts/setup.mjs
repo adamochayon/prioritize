@@ -82,8 +82,8 @@ function hasRealScriptId(obj) {
 }
 
 async function ensureLoggedIn() {
-  const status = await clasp(['login', '--status'], { capture: true });
-  if (status.code === 0 && /logged in/i.test(status.stdout + status.stderr)) return;
+  const status = await clasp(['show-authorized-user'], { capture: true });
+  if (status.code === 0 && /logged in as/i.test(status.stdout + status.stderr)) return;
 
   console.log('\nNot logged in to clasp — launching browser login.');
   const loginCode = await clasp(['login']);
@@ -94,7 +94,7 @@ async function ensureLoggedIn() {
     );
   }
 
-  const recheck = await clasp(['login', '--status'], { capture: true });
+  const recheck = await clasp(['show-authorized-user'], { capture: true });
   if (recheck.code !== 0 || !/logged in/i.test(recheck.stdout + recheck.stderr)) {
     fail(
       'Still not logged in after `clasp login`. Enable the Apps Script API at ' +
@@ -141,7 +141,7 @@ async function patchClaspJson() {
 
 async function createProject(title) {
   const startMs = Date.now();
-  const code = await clasp(['create-script', '--type', 'webapp', '--title', title]);
+  const code = await clasp(['create-script', '--type', 'standalone', '--title', title]);
   if (code !== 0) {
     fail(
       'clasp create-script failed. If a project was partially created, delete .clasp.json ' +
@@ -168,7 +168,9 @@ async function push(scriptId) {
 }
 
 function parseDeploymentId(stdout) {
-  const match = stdout.match(/Deployment ID:\s*([A-Za-z0-9_-]+)/);
+  const match =
+    stdout.match(/Deployment ID:\s*([A-Za-z0-9_-]+)/) ||
+    stdout.match(/Deployed\s+([A-Za-z0-9_-]+)/);
   return match ? match[1] : null;
 }
 
@@ -185,30 +187,61 @@ async function deploy(scriptId) {
   return result.stdout;
 }
 
+async function promptAndOpen(url) {
+  if (!process.stdout.isTTY || !process.stdin.isTTY) return;
+  const cmd =
+    process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+  const rl = createInterface({ input, output });
+  try {
+    await rl.question('Press Enter to open the web app in your browser (Ctrl-C to skip)… ');
+  } catch {
+    return;
+  } finally {
+    rl.close();
+  }
+  spawn(cmd, [url], {
+    stdio: 'ignore',
+    detached: true,
+    shell: process.platform === 'win32',
+  }).unref();
+}
+
+function link(url, label = url) {
+  if (!process.stdout.isTTY) return label === url ? url : `${label} (${url})`;
+  return `\u001B]8;;${url}\u0007${label}\u001B]8;;\u0007`;
+}
+
 function printSuccess({ scriptId, deploymentId, rawDeployStdout, title }) {
   const header = '\n================  Prioritize deployed  ================';
   console.log(header);
 
   if (deploymentId) {
     const webUrl = `https://script.google.com/macros/s/${deploymentId}/exec`;
-    console.log(`Web app:   ${webUrl}`);
-    console.log(`Admin:     ${webUrl}?v=admin`);
+    const adminUrl = `${webUrl}?v=admin`;
+    console.log(`Web app:   ${link(webUrl)}`);
+    console.log(`Admin:     ${link(adminUrl)}`);
   } else {
+    const editUrl = `https://script.google.com/d/${scriptId}/edit`;
     console.log('Could not parse deployment ID from clasp output.');
     console.log('Raw clasp deploy output follows:');
     console.log(rawDeployStdout);
-    console.log(`Manage deployments: https://script.google.com/d/${scriptId}/edit`);
+    console.log(`Manage deployments: ${link(editUrl)}`);
   }
 
+  const sheetName = /prioritize/i.test(title) ? title : `Prioritize — ${title}`;
+  const sheetSearchUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(`type:spreadsheet ${sheetName}`)}`;
   console.log('');
   console.log(
-    `Open the web app URL once — it auto-creates the backing Sheet in your Drive, named "${title}".`
+    `Open the web app URL once — it auto-creates the backing Sheet in your Drive, named "${sheetName}".`
   );
-  console.log(
-    `Drive search fallback: https://drive.google.com/drive/search?q=${encodeURIComponent(title)}`
-  );
+  console.log(`Drive search fallback: ${link(sheetSearchUrl)}`);
   console.log('To redeploy after code changes: `npm run setup` (idempotent).');
   console.log('========================================================\n');
+
+  if (deploymentId) {
+    return `https://script.google.com/macros/s/${deploymentId}/exec`;
+  }
+  return null;
 }
 
 async function main() {
@@ -223,12 +256,13 @@ async function main() {
     await push(existing.scriptId);
     const stdout = await deploy(existing.scriptId);
     const deploymentId = parseDeploymentId(stdout);
-    printSuccess({
+    const webUrl = printSuccess({
       scriptId: existing.scriptId,
       deploymentId,
       rawDeployStdout: stdout,
       title: 'Prioritize',
     });
+    if (webUrl) await promptAndOpen(webUrl);
     return;
   }
 
@@ -238,12 +272,13 @@ async function main() {
   await push(claspJson.scriptId);
   const stdout = await deploy(claspJson.scriptId);
   const deploymentId = parseDeploymentId(stdout);
-  printSuccess({
+  const webUrl = printSuccess({
     scriptId: claspJson.scriptId,
     deploymentId,
     rawDeployStdout: stdout,
     title,
   });
+  if (webUrl) await promptAndOpen(webUrl);
 }
 
 try {
