@@ -536,6 +536,7 @@
         r.checked = r.value === mode;
       });
       updateModeUI(mode, cfg.buckets);
+      populateBuckets(mode === 'topn' ? CANONICAL_BUCKETS : (cfg.buckets || CANONICAL_BUCKETS));
 
       var rv = cfg.resultsVisibility || 'always';
       document.querySelectorAll('input[name="results_visibility"]').forEach(function(r) {
@@ -560,11 +561,6 @@
         }
       }
 
-      if (isMoscow && buckets) {
-        populateBuckets(buckets);
-      } else if (isMoscow) {
-        // switching to moscow with no buckets provided — leave existing editor state
-      }
     }
 
     document.querySelectorAll('input[name="mode"]').forEach(function(r) {
