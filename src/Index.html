@@ -370,6 +370,7 @@
       }
       .dist-segment {
         height: 100%;
+        transition: width 0.25s ease;
       }
       .dist-segment.must {
         background: var(--accent);
@@ -456,6 +457,71 @@
         display: none !important;
       }
 
+      /* Submitter filter */
+      .submitter-filter {
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      .submitter-filter-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      .submitter-filter-label {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .submitter-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .submitter-chip {
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        color: var(--text);
+        font: inherit;
+        font-size: 12px;
+        padding: 3px 10px;
+        cursor: pointer;
+        border-radius: 0;
+        white-space: nowrap;
+        transition:
+          opacity 0.15s ease,
+          border-color 0.15s ease;
+      }
+      .submitter-chip:hover {
+        border-color: var(--accent);
+      }
+      .submitter-chip.is-off {
+        text-decoration: line-through;
+        opacity: 0.45;
+        border-color: var(--border);
+        background: transparent;
+      }
+      .submitter-chip.is-off:hover {
+        opacity: 0.7;
+        border-color: var(--muted);
+      }
+      .submitter-reset {
+        background: transparent;
+        border: none;
+        color: var(--muted);
+        font: inherit;
+        font-size: 11px;
+        padding: 2px 6px;
+        cursor: pointer;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .submitter-reset:hover {
+        color: var(--text);
+      }
+
       footer {
         margin-top: 40px;
         color: var(--muted);
@@ -519,6 +585,9 @@
         hasPriorSubmission: false,
         submitting: false,
       };
+
+      let lastResultsData = null;
+      const hiddenSubmitters = new Set();
 
       // ---------- Boot ------------------------------------------------------
 
@@ -885,6 +954,78 @@
 
       const BUCKET_LETTER = { must: 'M', should: 'S', could: 'C', wont: 'W' };
 
+      function submitterKey(sub) {
+        return (sub && (sub.email || sub.displayName)) || '';
+      }
+
+      function isFilterUsable(submissions) {
+        if (!submissions || submissions.length < 2) return false;
+        const keys = new Set(submissions.map(submitterKey).filter(Boolean));
+        if (keys.size < 2) return false;
+        const allAnon = submissions.every((s) => !s.email && s.displayName === 'Anonymous');
+        return !allAnon;
+      }
+
+      function stdevClient(arr) {
+        if (!arr || arr.length < 2) return 0;
+        const mean = arr.reduce((s, v) => s + v, 0) / arr.length;
+        const variance = arr.reduce((s, v) => s + (v - mean) ** 2, 0) / arr.length;
+        return Math.sqrt(variance);
+      }
+
+      function recomputeItems(cfg, originalItems, visibleSubs) {
+        const buckets = cfg.buckets || [];
+        const weight = {};
+        const countsTemplate = {};
+        buckets.forEach((b) => {
+          weight[b.id] = b.weight;
+          countsTemplate[b.id] = 0;
+        });
+
+        const byId = {};
+        originalItems.forEach((it) => {
+          byId[it.id] = {
+            id: it.id,
+            name: it.name,
+            score: 0,
+            bucketCounts: Object.assign({}, countsTemplate),
+            voters: [],
+            weights: [],
+          };
+        });
+
+        visibleSubs.forEach((sub) => {
+          const a = sub.assignments || {};
+          originalItems.forEach((it) => {
+            const bid = a[it.id];
+            if (!bid || weight[bid] === undefined) return;
+            const entry = byId[it.id];
+            entry.score += weight[bid];
+            entry.bucketCounts[bid] += 1;
+            entry.voters.push({ voter: sub.displayName || sub.email, bucket: bid });
+            entry.weights.push(weight[bid]);
+          });
+        });
+
+        const list = Object.values(byId).map((e) => ({
+          id: e.id,
+          name: e.name,
+          score: e.score,
+          bucketCounts: e.bucketCounts,
+          voters: e.voters,
+          stdev: stdevClient(e.weights),
+        }));
+        list.sort((a, b) => b.score - a.score || a.stdev - b.stdev);
+        return list;
+      }
+
+      function withTransition(cb) {
+        if (typeof document.startViewTransition === 'function') {
+          return document.startViewTransition(cb);
+        }
+        cb();
+      }
+
       function renderResults(data) {
         const el = document.getElementById('results-content');
         el.className = '';
@@ -901,29 +1042,51 @@
           el.innerHTML = `<div class="notice">No submissions yet. Be the first — switch to <b>Rank</b>.</div>`;
           return;
         }
-        const voterCount = data.submissions.length;
-        const itemsHtml = data.items
-          .map((item, idx) => {
-            const chips = item.voters
-              .map((v) => {
-                const letter = BUCKET_LETTER[v.bucket] || v.bucket;
-                return `<span class="voter-chip"><span class="voter-name">${escapeHtml(v.voter)}</span> <span class="bucket-letter ${escapeHtml(v.bucket)} mono">${letter}</span></span>`;
-              })
-              .join('');
-            const stdev = item.stdev
-              ? `<span class="result-meta mono">\u03c3 ${item.stdev.toFixed(1)}</span>`
-              : '';
-            const totalVoters = item.voters.length || 1;
-            const distBar = state.config.buckets
-              .map((b) => {
-                const pct = (item.bucketCounts[b.id] / totalVoters) * 100;
-                return pct > 0
-                  ? `<div class="dist-segment ${b.id}" style="width:${pct}%"></div>`
-                  : '';
-              })
-              .join('');
-            return `
-          <div class="result-row">
+        lastResultsData = data;
+        const validKeys = new Set(data.submissions.map(submitterKey));
+        for (const k of Array.from(hiddenSubmitters)) {
+          if (!validKeys.has(k)) hiddenSubmitters.delete(k);
+        }
+        rerenderResults();
+      }
+
+      function rerenderResults() {
+        const el = document.getElementById('results-content');
+        const data = lastResultsData;
+        if (!data) return;
+        const submissions = data.submissions;
+        const visibleSubs = submissions.filter((s) => !hiddenSubmitters.has(submitterKey(s)));
+        const items = recomputeItems(state.config, data.items, visibleSubs);
+
+        const filterHtml = renderSubmitterFilter(submissions);
+
+        let itemsBlockHtml;
+        if (visibleSubs.length === 0) {
+          itemsBlockHtml = `<div class="notice">All submitters hidden — use the toggles above to include some.</div>`;
+        } else {
+          itemsBlockHtml = items
+            .map((item, idx) => {
+              const chips = item.voters
+                .map((v) => {
+                  const letter = BUCKET_LETTER[v.bucket] || v.bucket;
+                  return `<span class="voter-chip"><span class="voter-name">${escapeHtml(v.voter)}</span> <span class="bucket-letter ${escapeHtml(v.bucket)} mono">${letter}</span></span>`;
+                })
+                .join('');
+              const stdev = item.stdev
+                ? `<span class="result-meta mono">\u03c3 ${item.stdev.toFixed(1)}</span>`
+                : '';
+              const totalVoters = item.voters.length || 1;
+              const distBar = state.config.buckets
+                .map((b) => {
+                  const pct = (item.bucketCounts[b.id] / totalVoters) * 100;
+                  return pct > 0
+                    ? `<div class="dist-segment ${b.id}" style="width:${pct}%"></div>`
+                    : '';
+                })
+                .join('');
+              const vtName = `vt-row-${String(item.id).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+              return `
+          <div class="result-row" style="view-transition-name: ${vtName}">
             <div class="result-head">
               <span class="result-rank mono">${idx + 1}</span>
               <span class="result-name">${escapeHtml(item.name)}</span>
@@ -934,15 +1097,69 @@
             <div class="voter-chips">${chips || '<span>no votes</span>'}</div>
           </div>
         `;
-          })
-          .join('');
+            })
+            .join('');
+        }
 
-        const subs = renderSubmissions(data.submissions);
+        const voterCount = submissions.length;
+        const visibleCount = visibleSubs.length;
+        const countLabel =
+          visibleCount === voterCount
+            ? `${voterCount} submission${voterCount === 1 ? '' : 's'}`
+            : `${visibleCount} of ${voterCount} submissions included`;
+
+        const subs = renderSubmissions(submissions);
         el.innerHTML = `
-        <div class="section-label">${voterCount} submission${voterCount === 1 ? '' : 's'}</div>
-        ${itemsHtml}
+        <div class="section-label">${countLabel}</div>
+        ${filterHtml}
+        ${itemsBlockHtml}
         ${subs}
       `;
+        wireSubmitterFilter();
+      }
+
+      function renderSubmitterFilter(submissions) {
+        if (!isFilterUsable(submissions)) return '';
+        const chips = submissions
+          .map((s) => {
+            const key = submitterKey(s);
+            const hidden = hiddenSubmitters.has(key);
+            const label = s.displayName || s.email || '(unknown)';
+            return `<button type="button" class="submitter-chip${hidden ? ' is-off' : ''}" data-submitter-key="${escapeHtml(key)}" aria-pressed="${hidden ? 'false' : 'true'}">${escapeHtml(label)}</button>`;
+          })
+          .join('');
+        const hasHidden = submissions.some((s) => hiddenSubmitters.has(submitterKey(s)));
+        const resetBtn = hasHidden
+          ? `<button type="button" class="submitter-reset" id="submitter-reset">Reset</button>`
+          : '';
+        return `
+        <div class="submitter-filter" id="submitter-filter">
+          <div class="submitter-filter-header">
+            <span class="submitter-filter-label">Submitters</span>
+            ${resetBtn}
+          </div>
+          <div class="submitter-chips">${chips}</div>
+        </div>
+      `;
+      }
+
+      function wireSubmitterFilter() {
+        const container = document.getElementById('submitter-filter');
+        if (!container) return;
+        container.addEventListener('click', (e) => {
+          const btn = e.target.closest('.submitter-chip');
+          if (btn) {
+            const key = btn.getAttribute('data-submitter-key') || '';
+            if (hiddenSubmitters.has(key)) hiddenSubmitters.delete(key);
+            else hiddenSubmitters.add(key);
+            withTransition(rerenderResults);
+            return;
+          }
+          if (e.target.id === 'submitter-reset') {
+            hiddenSubmitters.clear();
+            withTransition(rerenderResults);
+          }
+        });
       }
 
       function renderSubmissions(subs) {
@@ -991,7 +1208,12 @@
           const view = tab.dataset.view;
           document.getElementById('view-rank').classList.toggle('hidden', view !== 'rank');
           document.getElementById('view-results').classList.toggle('hidden', view !== 'results');
-          if (view === 'results') loadResults();
+          if (view === 'results') {
+            loadResults();
+          } else {
+            hiddenSubmitters.clear();
+            lastResultsData = null;
+          }
         });
       });
 

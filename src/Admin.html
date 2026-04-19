@@ -76,119 +76,6 @@
         color: var(--danger);
       }
 
-      /* Results */
-      .result-row {
-        padding: 12px 0;
-        border-bottom: 1px solid var(--border);
-      }
-      .result-head {
-        display: flex;
-        align-items: baseline;
-        gap: 10px;
-      }
-      .result-rank {
-        color: var(--accent);
-        font-size: 16px;
-        min-width: 28px;
-      }
-      .result-name {
-        flex: 1;
-      }
-      .result-score {
-        color: var(--accent);
-      }
-      .result-meta {
-        color: var(--muted);
-        font-size: 12px;
-        margin-left: 6px;
-      }
-      .dist-bar {
-        height: 4px;
-        display: flex;
-        margin: 6px 0 0 38px;
-        max-width: calc(100% - 38px);
-        overflow: hidden;
-      }
-      .dist-segment {
-        height: 100%;
-      }
-      .dist-segment.must {
-        background: var(--accent);
-      }
-      .dist-segment.should {
-        background: var(--should-color);
-      }
-      .dist-segment.could {
-        background: var(--could-color);
-      }
-      .dist-segment.wont {
-        background: var(--wont-color);
-      }
-      .voter-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-left: 38px;
-        margin-top: 6px;
-        color: var(--muted);
-        font-size: 12px;
-      }
-      .voter-chip .voter-name {
-        color: #aaa;
-      }
-      .voter-chip .bucket-letter {
-        font-weight: 700;
-      }
-      .voter-chip .bucket-letter.must {
-        color: var(--accent);
-      }
-      .voter-chip .bucket-letter.should {
-        color: var(--should-color);
-      }
-      .voter-chip .bucket-letter.could {
-        color: var(--muted);
-      }
-      .voter-chip .bucket-letter.wont {
-        color: var(--danger);
-      }
-
-      details.submissions {
-        margin-top: 32px;
-        color: var(--muted);
-      }
-      details.submissions summary {
-        cursor: pointer;
-      }
-      details.submissions .submission {
-        margin: 12px 0;
-        padding: 10px 12px;
-        border: 1px solid var(--border);
-      }
-      details.submissions .submission h4 {
-        margin: 0 0 8px;
-        color: var(--text);
-        font-size: 14px;
-      }
-      .sub-bucket-group {
-        margin-bottom: 8px;
-      }
-      .sub-bucket-label {
-        font-size: 11px;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        color: var(--muted);
-        margin-bottom: 3px;
-      }
-      .sub-bucket-items {
-        margin: 0;
-        padding: 0 0 0 12px;
-        list-style: disc;
-      }
-      .sub-bucket-items li {
-        margin: 1px 0;
-        font-size: 13px;
-      }
-
       .loading {
         color: var(--muted);
         padding: 20px 0;
@@ -579,10 +466,13 @@
           </div>
         </div>
 
-        <!-- Results section -->
+        <!-- Results link -->
         <div class="admin-section">
           <div class="admin-section-title">Results</div>
-          <div id="results-content" class="loading">Loading results&hellip;</div>
+          <p class="warning-text">See aggregated results in the main app.</p>
+          <a id="results-link" href="#" target="_blank" rel="noopener" class="sheet-link"
+            >View results &rarr;</a
+          >
         </div>
 
         <!-- Danger zone -->
@@ -617,10 +507,10 @@
         document.getElementById('stat-items').textContent = data.stats.itemCount;
         document.getElementById('sheet-link').href = data.sheetUrl;
         document.getElementById('view-ranking-link').href = data.webAppUrl;
+        document.getElementById('results-link').href = data.webAppUrl;
 
         populateForm(data.config);
         populateItems(data.config.items || []);
-        loadResults();
       }
 
       function onError(err) {
@@ -1018,11 +908,8 @@
             document.getElementById('stat-items').textContent = data.stats.itemCount;
             populateForm(data.config);
             populateItems(data.config.items || []);
-            loadResults();
           })
-          .withFailureHandler(function () {
-            loadResults();
-          })
+          .withFailureHandler(function () {})
           .getAdminBoot();
       }
 
@@ -1075,198 +962,6 @@
           })
           .deleteAllSubmissions();
       });
-
-      // ---------- Results ----------------------------------------------------
-
-      function loadResults() {
-        var el = document.getElementById('results-content');
-        el.className = 'loading';
-        el.textContent = 'Loading results\u2026';
-        google.script.run
-          .withSuccessHandler(renderResults)
-          .withFailureHandler(function (err) {
-            el.className = '';
-            el.innerHTML =
-              '<div class="notice error">' +
-              escapeHtml((err && err.message) || 'Failed to load results.') +
-              '</div>';
-          })
-          .getResults();
-      }
-
-      var BUCKET_LETTER = { must: 'M', should: 'S', could: 'C', wont: 'W', top: 'T' };
-
-      function renderResults(data) {
-        var el = document.getElementById('results-content');
-        el.className = '';
-
-        if (data.gated) {
-          el.innerHTML =
-            '<div class="notice">' + escapeHtml('Results gated: ' + data.gated) + '</div>';
-          return;
-        }
-
-        if (!data.submissions || data.submissions.length === 0) {
-          el.innerHTML = '<div class="notice">No submissions yet.</div>';
-          return;
-        }
-
-        var cfg = (boot && boot.config) || {};
-        var buckets = cfg.buckets || [];
-
-        var voterCount = data.submissions.length;
-        var itemsHtml = data.items
-          .map(function (item, idx) {
-            var chips = item.voters
-              .map(function (v) {
-                var letter = BUCKET_LETTER[v.bucket] || v.bucket;
-                return (
-                  '<span class="voter-chip"><span class="voter-name">' +
-                  escapeHtml(v.voter) +
-                  '</span> <span class="bucket-letter ' +
-                  escapeHtml(v.bucket) +
-                  ' mono">' +
-                  escapeHtml(letter) +
-                  '</span></span>'
-                );
-              })
-              .join('');
-            var stdev = item.stdev
-              ? '<span class="result-meta mono">\u03c3 ' + item.stdev.toFixed(1) + '</span>'
-              : '';
-            var totalVoters = item.voters.length || 1;
-            var distBar = buckets
-              .map(function (b) {
-                var pct = ((item.bucketCounts[b.id] || 0) / totalVoters) * 100;
-                return pct > 0
-                  ? '<div class="dist-segment ' +
-                      escapeHtml(b.id) +
-                      '" style="width:' +
-                      pct +
-                      '%"></div>'
-                  : '';
-              })
-              .join('');
-            return (
-              '<div class="result-row">' +
-              '<div class="result-head">' +
-              '<span class="result-rank mono">' +
-              (idx + 1) +
-              '</span>' +
-              '<span class="result-name">' +
-              escapeHtml(item.name) +
-              '</span>' +
-              '<span class="result-score mono">' +
-              item.score +
-              '</span>' +
-              stdev +
-              '</div>' +
-              '<div class="dist-bar">' +
-              distBar +
-              '</div>' +
-              '<div class="voter-chips">' +
-              (chips || '<span>no votes</span>') +
-              '</div>' +
-              '</div>'
-            );
-          })
-          .join('');
-
-        var subs = renderSubmissions(data.submissions, buckets, cfg.items || []);
-
-        el.innerHTML =
-          '<div class="section-label">' +
-          voterCount +
-          ' submission' +
-          (voterCount === 1 ? '' : 's') +
-          '</div>' +
-          itemsHtml +
-          subs;
-      }
-
-      function renderSubmissions(subs, buckets, cfgItems) {
-        var itemById = {};
-        (cfgItems || []).forEach(function (i) {
-          itemById[i.id] = i.name;
-        });
-        var sorted = subs.slice().sort(function (a, b) {
-          return new Date(b.submittedAt) - new Date(a.submittedAt);
-        });
-        var rows = sorted
-          .map(function (s) {
-            var a = s.assignments || {};
-            var groups = buckets
-              .map(function (b) {
-                var names = Object.keys(a)
-                  .filter(function (id) {
-                    return a[id] === b.id;
-                  })
-                  .map(function (id) {
-                    return escapeHtml(itemById[id] || id);
-                  });
-                if (!names.length) return '';
-                return (
-                  '<div class="sub-bucket-group">' +
-                  '<div class="sub-bucket-label">' +
-                  escapeHtml(b.label) +
-                  '</div>' +
-                  '<ul class="sub-bucket-items">' +
-                  names
-                    .map(function (n) {
-                      return '<li>' + n + '</li>';
-                    })
-                    .join('') +
-                  '</ul>' +
-                  '</div>'
-                );
-              })
-              .join('');
-            return (
-              '<div class="submission">' +
-              '<h4>' +
-              escapeHtml(s.displayName || s.email) +
-              ' <span class="result-meta">' +
-              escapeHtml(fmtTime(s.submittedAt)) +
-              '</span></h4>' +
-              groups +
-              '</div>'
-            );
-          })
-          .join('');
-
-        return (
-          '<details class="submissions"><summary>Individual submissions (' +
-          subs.length +
-          ')</summary>' +
-          rows +
-          '</details>'
-        );
-      }
-
-      // ---------- Utilities --------------------------------------------------
-
-      function escapeHtml(s) {
-        return String(s == null ? '' : s)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#39;');
-      }
-
-      function fmtTime(iso) {
-        if (!iso) return '';
-        var d = new Date(iso);
-        if (isNaN(d)) return '';
-        var now = new Date();
-        var sameDay = d.toDateString() === now.toDateString();
-        if (sameDay) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-        return (
-          d.toLocaleDateString([], { month: 'short', day: 'numeric' }) +
-          ' ' +
-          d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-        );
-      }
     </script>
   </body>
 </html>
