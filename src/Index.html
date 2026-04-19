@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <base target="_top" />
     <title>Prioritize</title>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
     <style>
       :root {
         --bg: #0d0f12;
@@ -633,9 +633,40 @@
         font-size: 12px;
         text-align: center;
       }
+
+      #nav-progress {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: transparent;
+        z-index: 9999;
+        pointer-events: none;
+        overflow: hidden;
+      }
+      #nav-progress.is-loading::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 40%;
+        background: var(--accent);
+        animation: nav-progress-slide 1.2s infinite ease-in-out;
+      }
+      @keyframes nav-progress-slide {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(350%);
+        }
+      }
     </style>
   </head>
   <body>
+    <div id="nav-progress"></div>
     <main>
       <header>
         <h1>Prioritize</h1>
@@ -695,6 +726,15 @@
       </div>
     </main>
 
+    <script type="application/json" id="boot-data">
+      <?!= bootJson ?>
+    </script>
+    <? if (resultsJson) { ?>
+    <script type="application/json" id="results-data">
+      <?!= resultsJson ?>
+    </script>
+    <? } ?>
+
     <script>
       const INITIAL_VIEW = '<?= initialView ?>';
 
@@ -712,7 +752,24 @@
 
       // ---------- Boot ------------------------------------------------------
 
+      document.querySelectorAll('nav.tabs a.tab').forEach((a) => {
+        a.addEventListener('click', (e) => {
+          if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+          if (a.classList.contains('active')) return;
+          const bar = document.getElementById('nav-progress');
+          if (bar) bar.classList.add('is-loading');
+        });
+      });
+
       function onLoad() {
+        const bootEl = document.getElementById('boot-data');
+        const bootText = bootEl ? bootEl.textContent.trim() : '';
+        if (bootText) {
+          try {
+            onBoot(JSON.parse(bootText));
+            return;
+          } catch (e) {}
+        }
         google.script.run.withSuccessHandler(onBoot).withFailureHandler(onBootError).getBoot();
       }
 
@@ -880,6 +937,13 @@
       }
 
       function initSortables() {
+        if (typeof Sortable === 'undefined') {
+          // Sortable is loaded with `defer`, so it may not be ready yet when
+          // onBoot runs synchronously from inlined data. DOMContentLoaded fires
+          // after deferred scripts execute — retry then.
+          document.addEventListener('DOMContentLoaded', initSortables, { once: true });
+          return;
+        }
         const opts = {
           group: 'moscow',
           animation: 120,
@@ -1055,6 +1119,16 @@
 
       function loadResults() {
         const el = document.getElementById('results-content');
+        const inlineEl = document.getElementById('results-data');
+        const inlineText = inlineEl ? inlineEl.textContent.trim() : '';
+        if (inlineText) {
+          try {
+            const data = JSON.parse(inlineText);
+            inlineEl.remove();
+            renderResults(data);
+            return;
+          } catch (e) {}
+        }
         el.className = 'loading';
         el.textContent = 'Loading results\u2026';
         google.script.run

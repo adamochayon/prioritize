@@ -372,9 +372,40 @@
           align-items: flex-start;
         }
       }
+
+      #nav-progress {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: transparent;
+        z-index: 9999;
+        pointer-events: none;
+        overflow: hidden;
+      }
+      #nav-progress.is-loading::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 40%;
+        background: var(--accent);
+        animation: nav-progress-slide 1.2s infinite ease-in-out;
+      }
+      @keyframes nav-progress-slide {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(350%);
+        }
+      }
     </style>
   </head>
   <body>
+    <div id="nav-progress"></div>
     <main>
       <header>
         <h1 id="page-title">Prioritize</h1>
@@ -496,13 +527,39 @@
       </div>
     </main>
 
+    <script type="application/json" id="admin-boot-data">
+      <?!= adminBootJson ?>
+    </script>
+
     <script>
       var boot = null;
       var currentMode = 'moscow';
 
+      document.querySelectorAll('nav.tabs a.tab').forEach(function (a) {
+        a.addEventListener('click', function (e) {
+          if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+          if (a.classList.contains('active')) return;
+          var bar = document.getElementById('nav-progress');
+          if (bar) bar.classList.add('is-loading');
+        });
+      });
+
       // ---------- Boot -------------------------------------------------------
 
-      google.script.run.withSuccessHandler(onAdminBoot).withFailureHandler(onError).getAdminBoot();
+      (function () {
+        var bootEl = document.getElementById('admin-boot-data');
+        var bootText = bootEl ? bootEl.textContent.trim() : '';
+        if (bootText) {
+          try {
+            onAdminBoot(JSON.parse(bootText));
+            return;
+          } catch (e) {}
+        }
+        google.script.run
+          .withSuccessHandler(onAdminBoot)
+          .withFailureHandler(onError)
+          .getAdminBoot();
+      })();
 
       function onAdminBoot(data) {
         boot = data;

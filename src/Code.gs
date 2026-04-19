@@ -63,6 +63,8 @@ const DEFAULT_CONFIG = {
 
 var _isAdminCache = null; // null = uncached; true/false = cached result
 var _rowsCache = null; // null = uncached; array = cached readAllRows_ result
+var _configCache = null; // null = uncached; object = cached getConfig_ result
+var _itemsCache = null; // null = uncached; array = cached getItemsFromSheet_ result
 
 // ---------- Installer ----------------------------------------------------
 
@@ -265,6 +267,17 @@ function doGet(e) {
     const templateName = isAdm ? 'Admin' : 'NotAuthorized';
     const tpl = HtmlService.createTemplateFromFile(templateName);
     tpl.webAppUrl = webAppUrl;
+    if (isAdm) {
+      // Same hydration pattern as the main page — inline adminBoot JSON.
+      const safeJson = (obj) => JSON.stringify(obj).replace(/<\//g, '<\\/');
+      let adminBootJson = '';
+      try {
+        adminBootJson = safeJson(getAdminBoot());
+      } catch (err) {
+        adminBootJson = '';
+      }
+      tpl.adminBootJson = adminBootJson;
+    }
     return tpl
       .evaluate()
       .setTitle('Prioritize')
@@ -272,9 +285,32 @@ function doGet(e) {
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
   const indexTemplate = HtmlService.createTemplateFromFile('Index');
-  indexTemplate.initialView = v === 'results' ? 'results' : 'rank';
+  const initialView = v === 'results' ? 'results' : 'rank';
+  indexTemplate.initialView = initialView;
   indexTemplate.webAppUrl = webAppUrl;
   indexTemplate.isAdmin = isAdmin_();
+
+  // Server-side hydration: inline the same payloads the client would fetch,
+  // so first paint has real data with zero google.script.run round-trips.
+  // Escape </ so user-entered strings can't close the inline <script> element.
+  const safeJson = (obj) => JSON.stringify(obj).replace(/<\//g, '<\\/');
+  let bootJson = '';
+  let resultsJson = '';
+  try {
+    bootJson = safeJson(getBoot());
+  } catch (err) {
+    bootJson = '';
+  }
+  if (initialView === 'results' && bootJson) {
+    try {
+      resultsJson = safeJson(getResults());
+    } catch (err) {
+      resultsJson = '';
+    }
+  }
+  indexTemplate.bootJson = bootJson;
+  indexTemplate.resultsJson = resultsJson;
+
   return indexTemplate
     .evaluate()
     .setTitle('Prioritize')
@@ -402,11 +438,15 @@ function safeParse_(cell) {
 // ---------- Sheet readers ------------------------------------------------
 
 function getConfig_() {
+  if (_configCache !== null) return _configCache;
   const sheet = getConfigSheet_();
   const last = sheet.getLastRow();
   const defaults = DEFAULT_CONFIG;
 
-  if (last < 2) return defaults;
+  if (last < 2) {
+    _configCache = defaults;
+    return defaults;
+  }
 
   const rows = sheet.getRange(2, 1, last - 1, 2).getValues();
   const map = {};
@@ -442,7 +482,7 @@ function getConfig_() {
     anonymous = anonStr === 'true' || anonStr === '1';
   }
 
-  return {
+  _configCache = {
     title: map['title'] !== undefined ? String(map['title']) : defaults.title,
     subtitle: map['subtitle'] !== undefined ? String(map['subtitle']) : defaults.subtitle,
     blurb: map['blurb'] !== undefined ? String(map['blurb']) : defaults.blurb,
@@ -455,12 +495,17 @@ function getConfig_() {
     anonymous: anonymous,
     adminEmails: adminEmails,
   };
+  return _configCache;
 }
 
 function getItemsFromSheet_() {
+  if (_itemsCache !== null) return _itemsCache;
   const sheet = getItemsSheet_();
   const last = sheet.getLastRow();
-  if (last < 2) return [];
+  if (last < 2) {
+    _itemsCache = [];
+    return _itemsCache;
+  }
   const rows = sheet.getRange(2, 1, last - 1, ITEMS_HEADERS.length).getValues();
   const items = rows
     .filter(function (row) {
@@ -477,7 +522,8 @@ function getItemsFromSheet_() {
   items.sort(function (a, b) {
     return a.order - b.order;
   });
-  return items;
+  _itemsCache = items;
+  return _itemsCache;
 }
 
 // ---------- Config writer ------------------------------------------------
@@ -629,6 +675,7 @@ function saveConfig(payload) {
         sheet.getRange(i + 2, 2).setValue(updates[key]);
       }
     });
+    _configCache = null;
 
     // --- Write items to Items sheet if provided ---
     if (payload.items !== undefined) {
@@ -648,6 +695,7 @@ function saveConfig(payload) {
       if (itemRows.length > 0) {
         itemsSheet.getRange(2, 1, itemRows.length, 4).setValues(itemRows);
       }
+      _itemsCache = null;
     }
   } finally {
     lock.releaseLock();
