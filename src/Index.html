@@ -67,6 +67,8 @@
         padding: 6px 12px;
         cursor: pointer;
         border-radius: 0;
+        text-decoration: none;
+        display: inline-block;
       }
       .tab.active {
         color: var(--text);
@@ -638,8 +640,21 @@
       <header>
         <h1>Prioritize</h1>
         <nav class="tabs">
-          <button class="tab active" data-view="rank">Rank</button>
-          <button class="tab" data-view="results">Results</button>
+          <a
+            class="tab<?= initialView === 'rank' ? ' active' : '' ?>"
+            target="_top"
+            href="<?= webAppUrl ?>?v=rank"
+            >Rank</a
+          >
+          <a
+            class="tab<?= initialView === 'results' ? ' active' : '' ?>"
+            target="_top"
+            href="<?= webAppUrl ?>?v=results"
+            >Results</a
+          >
+          <? if (isAdmin) { ?>
+          <a class="tab admin-link" target="_top" href="<?= webAppUrl ?>?v=admin">Admin</a>
+          <? } ?>
         </nav>
       </header>
 
@@ -681,6 +696,8 @@
     </main>
 
     <script>
+      const INITIAL_VIEW = '<?= initialView ?>';
+
       const state = {
         config: null,
         me: null,
@@ -720,17 +737,6 @@
           blurbEl.insertAdjacentElement('afterend', sub);
         }
 
-        // Add Admin link if user is admin
-        if (boot.isAdmin) {
-          const nav = document.querySelector('nav.tabs');
-          const adminLink = document.createElement('a');
-          adminLink.href = boot.webAppUrl + '?v=admin';
-          adminLink.target = '_top';
-          adminLink.className = 'tab admin-link';
-          adminLink.textContent = 'Admin';
-          nav.appendChild(adminLink);
-        }
-
         renderBucketColumns();
         populateItems(boot.mySubmission);
         initSortables();
@@ -760,6 +766,10 @@
         document.getElementById('moscow-layout').classList.remove('hidden');
         syncUI();
         renderIdentityStrip();
+
+        if (INITIAL_VIEW === 'results') {
+          loadResults();
+        }
       }
 
       function onBootError(err) {
@@ -1695,22 +1705,14 @@
       `;
       }
 
-      // ---------- Tabs ------------------------------------------------------
+      // ---------- Initial view ----------------------------------------------
+      // loadResults() is called from onBoot() once state.config is hydrated,
+      // to avoid a race where getResults returns before getBoot.
 
-      document.querySelectorAll('.tab').forEach((tab) => {
-        tab.addEventListener('click', () => {
-          document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t === tab));
-          const view = tab.dataset.view;
-          document.getElementById('view-rank').classList.toggle('hidden', view !== 'rank');
-          document.getElementById('view-results').classList.toggle('hidden', view !== 'results');
-          if (view === 'results') {
-            loadResults();
-          } else {
-            hiddenSubmitters.clear();
-            lastResultsData = null;
-          }
-        });
-      });
+      if (INITIAL_VIEW === 'results') {
+        document.getElementById('view-rank').classList.add('hidden');
+        document.getElementById('view-results').classList.remove('hidden');
+      }
 
       // ---------- Utilities -------------------------------------------------
 

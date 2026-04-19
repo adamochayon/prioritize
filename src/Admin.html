@@ -85,13 +85,27 @@
       }
 
       /* Admin-specific */
-      .view-link {
-        font-size: 13px;
-        color: var(--accent);
-        text-decoration: none;
+      .tabs {
+        display: flex;
+        gap: 4px;
       }
-      .view-link:hover {
-        text-decoration: underline;
+      .tab {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font: inherit;
+        padding: 6px 12px;
+        cursor: pointer;
+        border-radius: 0;
+        text-decoration: none;
+        display: inline-block;
+      }
+      .tab.active {
+        color: var(--text);
+        border-color: var(--accent);
+      }
+      .tab:hover {
+        color: var(--text);
       }
 
       .data-strip {
@@ -363,8 +377,12 @@
   <body>
     <main>
       <header>
-        <h1 id="page-title">Admin</h1>
-        <a id="view-ranking-link" href="#" target="_top" class="view-link">View ranking &rarr;</a>
+        <h1 id="page-title">Prioritize</h1>
+        <nav class="tabs">
+          <a class="tab" target="_top" href="<?= webAppUrl ?>?v=rank">Rank</a>
+          <a class="tab" target="_top" href="<?= webAppUrl ?>?v=results">Results</a>
+          <a class="tab active" target="_top" href="<?= webAppUrl ?>?v=admin">Admin</a>
+        </nav>
       </header>
 
       <div id="boot-loading" class="loading">Loading&hellip;</div>
@@ -466,15 +484,6 @@
           </div>
         </div>
 
-        <!-- Results link -->
-        <div class="admin-section">
-          <div class="admin-section-title">Results</div>
-          <p class="warning-text">See aggregated results in the main app.</p>
-          <a id="results-link" href="#" target="_blank" rel="noopener" class="sheet-link"
-            >View results &rarr;</a
-          >
-        </div>
-
         <!-- Danger zone -->
         <div class="admin-section danger-zone">
           <div class="admin-section-title" style="color: var(--danger)">Danger zone</div>
@@ -501,13 +510,10 @@
         document.getElementById('boot-loading').classList.add('hidden');
         document.getElementById('admin-body').classList.remove('hidden');
 
-        document.getElementById('page-title').textContent =
-          'Admin · ' + (data.config.title || 'Prioritize');
+        document.getElementById('page-title').textContent = data.config.title || 'Prioritize';
         document.getElementById('stat-submissions').textContent = data.stats.submissionCount;
         document.getElementById('stat-items').textContent = data.stats.itemCount;
         document.getElementById('sheet-link').href = data.sheetUrl;
-        document.getElementById('view-ranking-link').href = data.webAppUrl;
-        document.getElementById('results-link').href = data.webAppUrl;
 
         populateForm(data.config);
         populateItems(data.config.items || []);

@@ -259,15 +259,23 @@ function isAdmin_() {
 function doGet(e) {
   ensureInstalled_();
   const v = e && e.parameter && e.parameter.v;
+  const webAppUrl = ScriptApp.getService().getUrl();
   if (v === 'admin') {
-    const template = isAdmin_() ? 'Admin' : 'NotAuthorized';
-    return HtmlService.createTemplateFromFile(template)
+    const isAdm = isAdmin_();
+    const templateName = isAdm ? 'Admin' : 'NotAuthorized';
+    const tpl = HtmlService.createTemplateFromFile(templateName);
+    tpl.webAppUrl = webAppUrl;
+    return tpl
       .evaluate()
       .setTitle('Prioritize')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
-  return HtmlService.createTemplateFromFile('Index')
+  const indexTemplate = HtmlService.createTemplateFromFile('Index');
+  indexTemplate.initialView = v === 'results' ? 'results' : 'rank';
+  indexTemplate.webAppUrl = webAppUrl;
+  indexTemplate.isAdmin = isAdmin_();
+  return indexTemplate
     .evaluate()
     .setTitle('Prioritize')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
