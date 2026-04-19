@@ -522,6 +522,109 @@
         color: var(--text);
       }
 
+      .insights-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .insight-card {
+        border: 1px solid var(--border);
+        background: var(--bg-elev);
+        padding: 10px 12px;
+        min-width: 180px;
+        flex: 1;
+      }
+      .insight-card-title {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      .insight-card-value {
+        font-size: 14px;
+        color: var(--text);
+        margin-bottom: 2px;
+      }
+      .insight-card-meta {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .consensus-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        vertical-align: middle;
+        margin-right: 5px;
+      }
+      .consensus-dot[data-level='green'] {
+        background: var(--accent);
+      }
+      .consensus-dot[data-level='yellow'] {
+        background: var(--should-color);
+      }
+      .consensus-dot[data-level='red'] {
+        background: var(--wont-color);
+      }
+      .results-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+      .results-header .section-label {
+        margin-bottom: 0;
+      }
+      .sort-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .sort-group-label {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .sort-toggle {
+        display: inline-flex;
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .sort-toggle button {
+        background: transparent;
+        color: var(--muted);
+        border: none;
+        padding: 4px 10px;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        font-family: inherit;
+        transition:
+          background 0.15s ease,
+          color 0.15s ease;
+      }
+      .sort-toggle button + button {
+        border-left: 1px solid var(--border);
+      }
+      .sort-toggle button:hover {
+        color: var(--text);
+      }
+      .sort-toggle button.active {
+        background: var(--bg-elev);
+        color: var(--accent);
+      }
+      .polarization-flag {
+        font-size: 12px;
+        color: var(--danger);
+        margin-left: 6px;
+        opacity: 0.8;
+      }
+
       footer {
         margin-top: 40px;
         color: var(--muted);
@@ -588,6 +691,7 @@
 
       let lastResultsData = null;
       const hiddenSubmitters = new Set();
+      let sortMode = 'score';
 
       // ---------- Boot ------------------------------------------------------
 
@@ -1019,6 +1123,337 @@
         return list;
       }
 
+      function computeItemInsights(item, buckets) {
+        const totalVoters = Object.values(item.bucketCounts).reduce((s, c) => s + c, 0);
+        if (totalVoters < 2) {
+          return { badgeLevel: null, polarized: false, entropyNorm: 0, mode: null };
+        }
+
+        let entropy = 0;
+        for (const [, count] of Object.entries(item.bucketCounts)) {
+          if (count > 0) {
+            const p = count / totalVoters;
+            entropy += -p * Math.log2(p);
+          }
+        }
+        const B = buckets.length;
+        let entropyNorm = B > 1 ? entropy / Math.log2(B) : 0;
+        entropyNorm = Math.max(0, Math.min(1, entropyNorm));
+
+        let badgeLevel;
+        if (entropyNorm < 0.3) badgeLevel = 'green';
+        else if (entropyNorm < 0.7) badgeLevel = 'yellow';
+        else badgeLevel = 'red';
+
+        let mode = null;
+        let modeCount = -1;
+        let modeWeight = -Infinity;
+        for (const bucket of buckets) {
+          const count = item.bucketCounts[bucket.id] || 0;
+          if (count > modeCount || (count === modeCount && bucket.weight > modeWeight)) {
+            modeCount = count;
+            modeWeight = bucket.weight;
+            mode = bucket.id;
+          }
+        }
+        if (modeCount === 0) mode = null;
+
+        let polarized = false;
+        if (buckets.length >= 3 && totalVoters >= 3) {
+          const sorted = buckets.slice().sort((a, b) => b.weight - a.weight);
+          const topBucketId = sorted[0].id;
+          const bottomBucketId = sorted[sorted.length - 1].id;
+          const topFrac = (item.bucketCounts[topBucketId] || 0) / totalVoters;
+          const bottomFrac = (item.bucketCounts[bottomBucketId] || 0) / totalVoters;
+          const middleFrac = 1 - topFrac - bottomFrac;
+          polarized = topFrac >= 0.25 && bottomFrac >= 0.25 && middleFrac < 0.3;
+        }
+
+        return { badgeLevel, polarized, entropyNorm, mode };
+      }
+
+      function computeGroupInsights(items, visibleSubs, cfg, submissions) {
+        if (visibleSubs.length < 2) {
+          return {
+            highestConsensus: null,
+            mostContention: null,
+            biggestOutlier: null,
+            mostAlignedPair: null,
+          };
+        }
+
+        const personCardsAllowed = isFilterUsable(submissions);
+
+        // --- Item-level cards ---
+        const B = cfg.buckets.length;
+        let highestConsensus = null;
+        let mostContention = null;
+
+        const qualifyingItems = items
+          .map((item) => {
+            const totalVoters = Object.values(item.bucketCounts).reduce((s, c) => s + c, 0);
+            if (totalVoters < 2) return null;
+
+            let entropy = 0;
+            for (const [, count] of Object.entries(item.bucketCounts)) {
+              if (count > 0) {
+                const p = count / totalVoters;
+                entropy -= p * Math.log2(p);
+              }
+            }
+            const entropyNorm = B > 1 ? Math.min(1, entropy / Math.log2(B)) : 0;
+
+            return { item, totalVoters, entropyNorm };
+          })
+          .filter(Boolean);
+
+        if (qualifyingItems.length > 0) {
+          // highestConsensus: minimum entropyNorm, tie-break by score descending
+          const consensusCandidate = qualifyingItems.slice().sort((a, b) => {
+            if (a.entropyNorm !== b.entropyNorm) return a.entropyNorm - b.entropyNorm;
+            return b.item.score - a.item.score;
+          })[0];
+
+          const cItem = consensusCandidate.item;
+          const cTotalVoters = consensusCandidate.totalVoters;
+
+          // mode: bucket id with highest count, tie-broken by weight descending
+          let modeId = null;
+          let modeCount = -1;
+          let modeWeight = -Infinity;
+          for (const bucket of cfg.buckets) {
+            const count = cItem.bucketCounts[bucket.id] || 0;
+            if (count > modeCount || (count === modeCount && bucket.weight > modeWeight)) {
+              modeCount = count;
+              modeWeight = bucket.weight;
+              modeId = bucket.id;
+            }
+          }
+          if (modeCount === 0) modeId = null;
+
+          highestConsensus = {
+            itemId: cItem.id,
+            itemName: cItem.name,
+            totalVoters: cTotalVoters,
+            mode: modeId,
+            bucketCounts: cItem.bucketCounts,
+          };
+
+          // mostContention: maximum entropyNorm, tie-break by score descending
+          const contentionCandidate = qualifyingItems.slice().sort((a, b) => {
+            if (a.entropyNorm !== b.entropyNorm) return b.entropyNorm - a.entropyNorm;
+            return b.item.score - a.item.score;
+          })[0];
+
+          const tItem = contentionCandidate.item;
+          const tTotalVoters = contentionCandidate.totalVoters;
+
+          let polarized = false;
+          if (cfg.buckets.length >= 3 && tTotalVoters >= 3) {
+            const sorted = cfg.buckets.slice().sort((a, b) => b.weight - a.weight);
+            const topFrac = (tItem.bucketCounts[sorted[0].id] || 0) / tTotalVoters;
+            const bottomFrac =
+              (tItem.bucketCounts[sorted[sorted.length - 1].id] || 0) / tTotalVoters;
+            const middleFrac = 1 - topFrac - bottomFrac;
+            polarized = topFrac >= 0.25 && bottomFrac >= 0.25 && middleFrac < 0.3;
+          }
+
+          mostContention = {
+            itemId: tItem.id,
+            itemName: tItem.name,
+            totalVoters: tTotalVoters,
+            stdev: tItem.stdev,
+            polarized,
+          };
+        }
+
+        // --- Person-level cards ---
+        let biggestOutlier = null;
+        let mostAlignedPair = null;
+
+        if (personCardsAllowed && visibleSubs.length >= 2) {
+          const weightMap = {};
+          cfg.buckets.forEach((b) => {
+            weightMap[b.id] = b.weight;
+          });
+
+          const allItemIds = cfg.items.map((it) => it.id);
+          const dim = allItemIds.length;
+
+          function vectorOf(sub) {
+            const a = sub.assignments || {};
+            return allItemIds.map((iid) => {
+              const bid = a[iid];
+              return bid && weightMap[bid] !== undefined ? weightMap[bid] : 0;
+            });
+          }
+
+          const vectors = visibleSubs.map(vectorOf);
+
+          // Biggest outlier (L2 distance from group mean)
+          const mean = new Array(dim).fill(0);
+          vectors.forEach((v) => {
+            for (let i = 0; i < dim; i++) mean[i] += v[i];
+          });
+          for (let i = 0; i < dim; i++) mean[i] /= vectors.length;
+
+          const distances = vectors.map((v) => {
+            let sumSq = 0;
+            for (let i = 0; i < dim; i++) {
+              const d = v[i] - mean[i];
+              sumSq += d * d;
+            }
+            return Math.sqrt(sumSq);
+          });
+
+          const weights = cfg.buckets.map((b) => b.weight);
+          const weightRange = Math.max(...weights) - Math.min(...weights);
+          const maxDist = Math.sqrt(dim) * weightRange;
+
+          // Find the submitter with the maximum distance, tie-break by displayName||email ascending
+          let bestIdx = -1;
+          let bestDist = -1;
+          for (let i = 0; i < distances.length; i++) {
+            if (distances[i] > bestDist) {
+              bestDist = distances[i];
+              bestIdx = i;
+            } else if (distances[i] === bestDist && bestIdx !== -1) {
+              const aLabel = visibleSubs[i].displayName || visibleSubs[i].email || '';
+              const bLabel = visibleSubs[bestIdx].displayName || visibleSubs[bestIdx].email || '';
+              if (aLabel < bLabel) bestIdx = i;
+            }
+          }
+
+          if (bestIdx !== -1 && bestDist > 0) {
+            const distancePct =
+              maxDist > 0 ? Math.max(0, Math.min(100, Math.round((bestDist / maxDist) * 100))) : 0;
+            biggestOutlier = {
+              key: submitterKey(visibleSubs[bestIdx]),
+              label: visibleSubs[bestIdx].displayName || visibleSubs[bestIdx].email || '(unknown)',
+              distancePct,
+            };
+          }
+
+          // Most aligned pair (cosine similarity)
+          function norm(v) {
+            let s = 0;
+            for (let i = 0; i < v.length; i++) s += v[i] * v[i];
+            return Math.sqrt(s);
+          }
+          function dot(a, b) {
+            let s = 0;
+            for (let i = 0; i < a.length; i++) s += a[i] * b[i];
+            return s;
+          }
+
+          const norms = vectors.map(norm);
+          let bestCos = -Infinity;
+          let bestPairA = -1;
+          let bestPairB = -1;
+
+          for (let a = 0; a < visibleSubs.length; a++) {
+            for (let b = a + 1; b < visibleSubs.length; b++) {
+              if (norms[a] === 0 || norms[b] === 0) continue;
+              const cos = dot(vectors[a], vectors[b]) / (norms[a] * norms[b]);
+              if (cos > bestCos) {
+                bestCos = cos;
+                bestPairA = a;
+                bestPairB = b;
+              } else if (cos === bestCos) {
+                // Tie-break: earliest submittedAt of the pair
+                const earliestCurrent = Math.min(
+                  new Date(visibleSubs[a].submittedAt).getTime(),
+                  new Date(visibleSubs[b].submittedAt).getTime()
+                );
+                const earliestBest = Math.min(
+                  new Date(visibleSubs[bestPairA].submittedAt).getTime(),
+                  new Date(visibleSubs[bestPairB].submittedAt).getTime()
+                );
+                if (earliestCurrent < earliestBest) {
+                  bestPairA = a;
+                  bestPairB = b;
+                }
+              }
+            }
+          }
+
+          if (bestPairA !== -1 && bestCos !== -Infinity) {
+            const subA = visibleSubs[bestPairA];
+            const subB = visibleSubs[bestPairB];
+            mostAlignedPair = {
+              aLabel: subA.displayName || subA.email || '(unknown)',
+              bLabel: subB.displayName || subB.email || '(unknown)',
+              similarityPct: Math.max(0, Math.min(100, Math.round(bestCos * 100))),
+            };
+          }
+        }
+
+        return { highestConsensus, mostContention, biggestOutlier, mostAlignedPair };
+      }
+
+      function renderInsightsStrip(group) {
+        if (!group) return '';
+        const cards = [];
+
+        if (group.highestConsensus) {
+          const g = group.highestConsensus;
+          const bucket = (state.config.buckets || []).find((b) => b.id === g.mode);
+          const bucketLabel = bucket ? bucket.label : g.mode;
+          const meta =
+            g.totalVoters > 0
+              ? `${g.bucketCounts[g.mode]} of ${g.totalVoters} said ${escapeHtml(bucketLabel)}`
+              : '';
+          cards.push(insightCardHtml('consensus', 'Highest consensus', g.itemName, meta));
+        }
+
+        if (group.mostContention) {
+          const g = group.mostContention;
+          const metaParts = [`\u03c3 ${g.stdev.toFixed(1)}`];
+          if (g.polarized) metaParts.push('split extremes');
+          cards.push(
+            insightCardHtml('contention', 'Most contention', g.itemName, metaParts.join(' \u00b7 '))
+          );
+        }
+
+        if (group.biggestOutlier) {
+          const g = group.biggestOutlier;
+          cards.push(
+            insightCardHtml(
+              'outlier',
+              'Biggest outlier',
+              g.label,
+              `${g.distancePct}% from group median`
+            )
+          );
+        }
+
+        if (group.mostAlignedPair) {
+          const g = group.mostAlignedPair;
+          cards.push(
+            insightCardHtml(
+              'aligned',
+              'Most aligned pair',
+              `${g.aLabel} \u00b7 ${g.bLabel}`,
+              `${g.similarityPct}% aligned`
+            )
+          );
+        }
+
+        if (cards.length === 0) return '';
+        return `<div class="insights-strip">${cards.join('')}</div>`;
+      }
+
+      function insightCardHtml(slot, title, value, meta) {
+        const vtName = `vt-insight-${slot}`;
+        return `
+          <div class="insight-card" style="view-transition-name: ${vtName}">
+            <div class="insight-card-title">${escapeHtml(title)}</div>
+            <div class="insight-card-value">${escapeHtml(value)}</div>
+            <div class="insight-card-meta">${meta}</div>
+          </div>
+        `;
+      }
+
       function withTransition(cb) {
         if (typeof document.startViewTransition === 'function') {
           return document.startViewTransition(cb);
@@ -1057,15 +1492,42 @@
         const submissions = data.submissions;
         const visibleSubs = submissions.filter((s) => !hiddenSubmitters.has(submitterKey(s)));
         const items = recomputeItems(state.config, data.items, visibleSubs);
+        const itemInsights = items.map((it) => computeItemInsights(it, state.config.buckets));
+        const group =
+          visibleSubs.length >= 2
+            ? computeGroupInsights(items, visibleSubs, state.config, submissions)
+            : null;
+        const stripHtml = renderInsightsStrip(group);
 
         const filterHtml = renderSubmitterFilter(submissions);
+
+        const paired = items.map((it, i) => ({ item: it, ins: itemInsights[i] }));
+        if (sortMode === 'agreement' || sortMode === 'contention') {
+          const sign = sortMode === 'contention' ? -1 : 1;
+          paired.sort((a, b) => {
+            const aHas = a.ins.badgeLevel !== null;
+            const bHas = b.ins.badgeLevel !== null;
+            if (aHas !== bHas) return aHas ? -1 : 1;
+            if (aHas) {
+              const diff = (a.item.stdev - b.item.stdev) * sign;
+              if (diff !== 0) return diff;
+            }
+            return b.item.score - a.item.score;
+          });
+        }
 
         let itemsBlockHtml;
         if (visibleSubs.length === 0) {
           itemsBlockHtml = `<div class="notice">All submitters hidden — use the toggles above to include some.</div>`;
         } else {
-          itemsBlockHtml = items
-            .map((item, idx) => {
+          itemsBlockHtml = paired
+            .map(({ item, ins }, idx) => {
+              const dot = ins.badgeLevel
+                ? `<span class="consensus-dot" data-level="${ins.badgeLevel}" title="${ins.badgeLevel === 'green' ? 'Strong agreement' : ins.badgeLevel === 'yellow' ? 'Mild spread' : 'Contention'}"></span>`
+                : '';
+              const flag = ins.polarized
+                ? `<span class="polarization-flag" title="Votes split between extremes">\u26a0</span>`
+                : '';
               const chips = item.voters
                 .map((v) => {
                   const letter = BUCKET_LETTER[v.bucket] || v.bucket;
@@ -1089,9 +1551,11 @@
           <div class="result-row" style="view-transition-name: ${vtName}">
             <div class="result-head">
               <span class="result-rank mono">${idx + 1}</span>
+              ${dot}
               <span class="result-name">${escapeHtml(item.name)}</span>
               <span class="result-score mono">${item.score}</span>
               ${stdev}
+              ${flag}
             </div>
             <div class="dist-bar">${distBar}</div>
             <div class="voter-chips">${chips || '<span>no votes</span>'}</div>
@@ -1108,14 +1572,45 @@
             ? `${voterCount} submission${voterCount === 1 ? '' : 's'}`
             : `${visibleCount} of ${voterCount} submissions included`;
 
+        const sortToggleHtml =
+          visibleSubs.length > 0
+            ? `
+        <div class="sort-group">
+          <span class="sort-group-label">Sort</span>
+          <div class="sort-toggle" id="sort-toggle" role="group" aria-label="Sort items">
+            <button type="button" data-sort="score" class="${sortMode === 'score' ? 'active' : ''}">Score</button>
+            <button type="button" data-sort="agreement" class="${sortMode === 'agreement' ? 'active' : ''}">Agreement</button>
+            <button type="button" data-sort="contention" class="${sortMode === 'contention' ? 'active' : ''}">Contention</button>
+          </div>
+        </div>`
+            : '';
+
         const subs = renderSubmissions(submissions);
         el.innerHTML = `
-        <div class="section-label">${countLabel}</div>
+        ${stripHtml}
+        <div class="results-header">
+          <span class="section-label">${countLabel}</span>
+          ${sortToggleHtml}
+        </div>
         ${filterHtml}
         ${itemsBlockHtml}
         ${subs}
       `;
         wireSubmitterFilter();
+        wireSortToggle();
+      }
+
+      function wireSortToggle() {
+        const container = document.getElementById('sort-toggle');
+        if (!container) return;
+        container.addEventListener('click', (e) => {
+          const btn = e.target.closest('button[data-sort]');
+          if (!btn) return;
+          const mode = btn.getAttribute('data-sort');
+          if (mode === sortMode) return;
+          sortMode = mode;
+          withTransition(rerenderResults);
+        });
       }
 
       function renderSubmitterFilter(submissions) {
